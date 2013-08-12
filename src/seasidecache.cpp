@@ -828,6 +828,13 @@ void SeasideCache::removeContactData(
 
     m_contacts[filter].remove(row);
 
+    if (filter == FilterAll) {
+        QList<QChar> modifiedNameGroups;
+        const QChar nameGroup = nameGroupForCacheItem(existingItem(contactId));
+        removeFromContactNameGroup(internalId(contactId), nameGroup, &modifiedNameGroups);
+        notifyNameGroupsChanged(modifiedNameGroups);
+    }
+
     for (int i = 0; i < models.count(); ++i)
         models.at(i)->sourceItemsRemoved();
 }
@@ -1743,8 +1750,7 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
             for (int i = 0; i < models.count(); ++i)
                 models.at(i)->sourceItemsInserted(begin, end);
 
-            if (!m_nameGroupChangeListeners.isEmpty())
-                notifyNameGroupsChanged(m_contactNameGroups.keys());
+            notifyNameGroupsChanged(m_contactNameGroups.keys());
         }
     }
 }
