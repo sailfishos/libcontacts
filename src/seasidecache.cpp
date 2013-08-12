@@ -1636,24 +1636,6 @@ void SeasideCache::relationshipsAvailable()
     }
 }
 
-void SeasideCache::finalizeUpdate(FilterType filter)
-{
-    const QList<ContactIdType> queryIds = m_contactIdRequest.ids();
-    QVector<ContactIdType> &cacheIds = m_contacts[filter];
-
-    if (m_cacheIndex < cacheIds.count())
-        removeRange(filter, m_cacheIndex, cacheIds.count() - m_cacheIndex);
-
-    if (m_queryIndex < queryIds.count()) {
-        const int count = queryIds.count() - m_queryIndex;
-        if (count)
-            insertRange(filter, cacheIds.count(), count, queryIds, m_queryIndex);
-    }
-
-    m_cacheIndex = 0;
-    m_queryIndex = 0;
-}
-
 void SeasideCache::removeRange(
         FilterType filter, int index, int count)
 {
@@ -1841,7 +1823,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         } else if (m_syncFilter != FilterNone) {
             // We have completed fetching this filter set
             completeSynchronizeList(this, m_contacts[m_syncFilter], m_cacheIndex, m_contactIdRequest.ids(), m_queryIndex);
-            finalizeUpdate(m_syncFilter);
 
             if (m_syncFilter == FilterFavorites) {
                 // Next, query for all contacts (including favorites)
