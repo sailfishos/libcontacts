@@ -687,10 +687,15 @@ QContact SeasideCache::contactById(const ContactIdType &id)
 void SeasideCache::ensureCompletion(CacheItem *cacheItem)
 {
     if (cacheItem->contactState < ContactRequested) {
-        cacheItem->contactState = ContactRequested;
-        instancePtr->m_changedContacts.append(cacheItem->apiId());
-        instancePtr->fetchContacts();
+        refreshContact(cacheItem);
     }
+}
+
+void SeasideCache::refreshContact(CacheItem *cacheItem)
+{
+    cacheItem->contactState = ContactRequested;
+    instancePtr->m_changedContacts.append(cacheItem->apiId());
+    instancePtr->fetchContacts();
 }
 
 SeasideCache::CacheItem *SeasideCache::itemByPhoneNumber(const QString &number, bool requireComplete)

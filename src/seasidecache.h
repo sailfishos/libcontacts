@@ -302,6 +302,7 @@ public:
     static QContact contactById(const ContactIdType &id);
 
     static void ensureCompletion(CacheItem *cacheItem);
+    static void refreshContact(CacheItem *cacheItem);
 
     static QChar nameGroup(const CacheItem *cacheItem);
     static QChar determineNameGroup(const CacheItem *cacheItem);
