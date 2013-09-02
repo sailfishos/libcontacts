@@ -1660,8 +1660,15 @@ void SeasideCache::contactsAvailable()
                 }
             }
 
+            bool roleDataChanged = false;
+
             // This is a simplification of reality, should we test more changes?
-            bool roleDataChanged = contact.detail<QContactAvatar>().imageUrl() != item->contact.detail<QContactAvatar>().imageUrl();
+            if (!partialFetch || queryDetailTypes.contains(detailType<QContactAvatar>())) {
+                roleDataChanged |= (contact.details<QContactAvatar>() != item->contact.details<QContactAvatar>());
+            }
+            if (!partialFetch || queryDetailTypes.contains(detailType<QContactGlobalPresence>())) {
+                roleDataChanged |= (contact.detail<QContactGlobalPresence>() != item->contact.detail<QContactGlobalPresence>());
+            }
 
             roleDataChanged |= updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
 
