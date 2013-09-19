@@ -347,7 +347,8 @@ SeasideCache::SeasideCache()
     , m_populated(0)
     , m_cacheIndex(0)
     , m_queryIndex(0)
-    , m_appendIndex(0)
+    , m_fetchProcessedCount(0)
+    , m_fetchByIdProcessedCount(0)
     , m_syncFilter(FilterNone)
     , m_displayLabelOrder(FirstNameFirst)
     , m_sortProperty(QString::fromLatin1("firstName"))
@@ -1221,6 +1222,8 @@ bool SeasideCache::event(QEvent *event)
         m_fetchByIdRequest.setLocalIds(m_constituentIds.toList());
 #endif
         m_fetchByIdRequest.start();
+
+        m_fetchByIdProcessedCount = 0;
     } else if (!m_contactsToFetchConstituents.isEmpty() && !m_relationshipsFetchRequest.isActive()) {
         QContactId aggregateId = m_contactsToFetchConstituents.first();
 
@@ -1255,7 +1258,7 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
-        m_appendIndex = 0;
+        m_fetchProcessedCount = 0;
         m_populateProgress = FetchFavorites;
     } else if ((m_populateProgress == Populated) && m_fetchTypesChanged && !m_fetchRequest.isActive()) {
         // We need to refetch the metadata for all contacts (because the required data changed)
@@ -1264,6 +1267,7 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
+        m_fetchProcessedCount = 0;
         m_fetchTypesChanged = false;
         m_populateProgress = RefetchFavorites;
     } else if (!m_changedContacts.isEmpty() && !m_fetchRequest.isActive()) {
@@ -1283,6 +1287,8 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.setFetchHint(basicFetchHint());
         m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
+
+        m_fetchProcessedCount = 0;
     } else if (!m_resolveAddresses.isEmpty() && !m_fetchRequest.isActive()) {
         const ResolveData &resolve = m_resolveAddresses.first();
 
@@ -1317,6 +1323,8 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes));
         m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
+
+        m_fetchProcessedCount = 0;
     } else if (m_refreshRequired && !m_contactIdRequest.isActive()) {
         m_refreshRequired = false;
 
@@ -1649,9 +1657,17 @@ void SeasideCache::contactsAvailable()
     QContactFetchHint fetchHint;
     if (request == &m_fetchByIdRequest) {
         contacts = m_fetchByIdRequest.contacts();
+        if (m_fetchByIdProcessedCount) {
+            contacts = contacts.mid(m_fetchByIdProcessedCount);
+        }
+        m_fetchByIdProcessedCount += contacts.count();
         fetchHint = m_fetchByIdRequest.fetchHint();
     } else {
         contacts = m_fetchRequest.contacts();
+        if (m_fetchProcessedCount) {
+            contacts = contacts.mid(m_fetchProcessedCount);
+        }
+        m_fetchProcessedCount += contacts.count();
         fetchHint = m_fetchRequest.fetchHint();
     }
 
@@ -1784,7 +1800,9 @@ void SeasideCache::contactIdsAvailable()
         return;
     }
 
-    synchronizeList(this, m_contacts[m_syncFilter], m_cacheIndex, m_contactIdRequest.ids(), m_queryIndex);
+    if (m_syncFilter != FilterNone) {
+        synchronizeList(this, m_contacts[m_syncFilter], m_cacheIndex, m_contactIdRequest.ids(), m_queryIndex);
+    }
 }
 
 void SeasideCache::relationshipsAvailable()
@@ -1879,7 +1897,7 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
         cacheIds.reserve(contacts.count());
 
         const int begin = cacheIds.count();
-        int end = cacheIds.count() + contacts.count() - m_appendIndex - 1;
+        int end = cacheIds.count() + contacts.count() - 1;
 
         if (begin <= end) {
             QSet<QString> modifiedGroups;
@@ -1887,8 +1905,7 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
             for (int i = 0; i < models.count(); ++i)
                 models.at(i)->sourceAboutToInsertItems(begin, end);
 
-            for (; m_appendIndex < contacts.count(); ++m_appendIndex) {
-                QContact contact = contacts.at(m_appendIndex);
+            foreach (QContact contact, contacts) {
                 ContactIdType apiId = SeasideCache::apiId(contact);
                 quint32 iid = internalId(contact);
 
@@ -2043,8 +2060,8 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_fetchRequest.setFetchHint(favoriteFetchHint(m_fetchTypes));
             m_fetchRequest.setSorting(m_sortOrder);
             m_fetchRequest.start();
+            m_fetchProcessedCount = 0;
 
-            m_appendIndex = 0;
             m_populateProgress = FetchFavorites;
             activityCompleted = false;
         } else if (m_populateProgress == FetchFavorites) {
@@ -2057,9 +2074,9 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_fetchRequest.setFetchHint(metadataFetchHint(m_fetchTypes));
             m_fetchRequest.setSorting(m_sortOrder);
             m_fetchRequest.start();
+            m_fetchProcessedCount = 0;
 
             m_fetchTypesChanged = false;
-            m_appendIndex = 0;
             m_populateProgress = FetchMetadata;
             activityCompleted = false;
         } else if (m_populateProgress == FetchMetadata) {
@@ -2072,8 +2089,8 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
             m_fetchRequest.setSorting(m_onlineSortOrder);
             m_fetchRequest.start();
+            m_fetchProcessedCount = 0;
 
-            m_appendIndex = 0;
             m_populateProgress = FetchOnline;
             activityCompleted = false;
         } else if (m_populateProgress == FetchOnline) {
@@ -2087,7 +2104,9 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
             m_fetchRequest.setSorting(m_sortOrder);
             m_fetchRequest.start();
+            m_fetchProcessedCount = 0;
 
+            m_fetchProcessedCount = 0;
             m_populateProgress = RefetchOthers;
         } else if (m_populateProgress == RefetchOthers) {
             // We're up to date again

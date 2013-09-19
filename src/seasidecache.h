@@ -473,7 +473,8 @@ private:
     int m_populated;
     int m_cacheIndex;
     int m_queryIndex;
-    int m_appendIndex;
+    int m_fetchProcessedCount;
+    int m_fetchByIdProcessedCount;
     FilterType m_syncFilter;
     DisplayLabelOrder m_displayLabelOrder;
     QString m_sortProperty;
