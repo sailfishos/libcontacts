@@ -876,6 +876,7 @@ void SeasideCache::removeContactData(
     for (int i = 0; i < models.count(); ++i)
         models.at(i)->sourceAboutToRemoveItems(row, row);
 
+    m_contactIndices[filter].remove(m_contacts[filter].at(row));
     m_contacts[filter].removeAt(row);
 
     if (filter == FilterAll) {
@@ -1857,6 +1858,7 @@ void SeasideCache::removeRange(FilterType filter, int index, int count)
             }
         }
 
+        m_contactIndices[filter].remove(cacheIds.at(index));
         cacheIds.removeAt(index);
     }
 
@@ -1888,6 +1890,7 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
         }
 
         cacheIds.insert(index + i, iid);
+        m_contactIndices[filter].insert(iid, index + i);
     }
 
     for (int i = 0; i < models.count(); ++i)
@@ -1917,6 +1920,7 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
                 quint32 iid = internalId(contact);
 
                 cacheIds.append(iid);
+                m_contactIndices[filterType].insert(iid, cacheIds.count() - 1);
 
                 CacheItem &cacheItem = m_people[iid];
 
@@ -2534,8 +2538,27 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
 
 int SeasideCache::contactIndex(quint32 iid, FilterType filterType)
 {
-    const QList<quint32> &cacheIds(m_contacts[filterType]);
-    return cacheIds.indexOf(iid);
+    QMap<quint32, int> &indices(m_contactIndices[filterType]);
+
+    QMap<quint32, int>::iterator it = indices.find(iid);
+    if (it != indices.end()) {
+        int index = *it;
+
+        const QList<quint32> &cacheIds(m_contacts[filterType]);
+        quint32 contactIid = cacheIds.at(index);
+        if (iid != contactIid) {
+            // This index is no longer correct - we need to update it
+            index = cacheIds.indexOf(iid);
+            if (index == -1) {
+                indices.erase(it);
+            } else {
+                *it = index;
+            }
+        }
+        return index;
+    }
+
+    return -1;
 }
 
 QContactRelationship SeasideCache::makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2)
