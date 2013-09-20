@@ -402,9 +402,9 @@ private:
     void removeRange(FilterType filter, int index, int count);
     int insertRange(FilterType filter, int index, int count, const QList<quint32> &queryIds, int queryIndex);
 
-    void contactDataChanged(const ContactIdType &contactId);
-    void contactDataChanged(const ContactIdType &contactId, FilterType filter);
-    void removeContactData(const ContactIdType &contactId, FilterType filter);
+    void contactDataChanged(quint32 iid);
+    void contactDataChanged(quint32 iid, FilterType filter);
+    void removeContactData(quint32 iid, FilterType filter);
     void makePopulated(FilterType filter);
 
     void addToContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);

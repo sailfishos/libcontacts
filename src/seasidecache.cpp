@@ -822,7 +822,7 @@ bool SeasideCache::saveContact(const QContact &contact)
     ContactIdType id = apiId(contact);
     if (validId(id)) {
         instancePtr->m_contactsToSave[id] = contact;
-        instancePtr->contactDataChanged(id);
+        instancePtr->contactDataChanged(internalId(id));
     } else {
         instancePtr->m_contactsToCreate.append(contact);
     }
@@ -832,16 +832,16 @@ bool SeasideCache::saveContact(const QContact &contact)
     return true;
 }
 
-void SeasideCache::contactDataChanged(const ContactIdType &contactId)
+void SeasideCache::contactDataChanged(quint32 iid)
 {
-    instancePtr->contactDataChanged(contactId, FilterFavorites);
-    instancePtr->contactDataChanged(contactId, FilterOnline);
-    instancePtr->contactDataChanged(contactId, FilterAll);
+    instancePtr->contactDataChanged(iid, FilterFavorites);
+    instancePtr->contactDataChanged(iid, FilterOnline);
+    instancePtr->contactDataChanged(iid, FilterAll);
 }
 
-void SeasideCache::contactDataChanged(const ContactIdType &contactId, FilterType filter)
+void SeasideCache::contactDataChanged(quint32 iid, FilterType filter)
 {
-    int row = contactIndex(internalId(contactId), filter);
+    int row = contactIndex(iid, filter);
     if (row != -1) {
         QList<ListModel *> &models = m_models[filter];
         for (int i = 0; i < models.count(); ++i) {
@@ -857,18 +857,19 @@ bool SeasideCache::removeContact(const QContact &contact)
         return false;
 
     instancePtr->m_contactsToRemove.append(id);
-    instancePtr->removeContactData(id, FilterFavorites);
-    instancePtr->removeContactData(id, FilterOnline);
-    instancePtr->removeContactData(id, FilterAll);
+
+    quint32 iid = internalId(id);
+    instancePtr->removeContactData(iid, FilterFavorites);
+    instancePtr->removeContactData(iid, FilterOnline);
+    instancePtr->removeContactData(iid, FilterAll);
 
     instancePtr->requestUpdate();
     return true;
 }
 
-void SeasideCache::removeContactData(
-        const ContactIdType &contactId, FilterType filter)
+void SeasideCache::removeContactData(quint32 iid, FilterType filter)
 {
-    int row = contactIndex(internalId(contactId), filter);
+    int row = contactIndex(iid, filter);
     if (row == -1)
         return;
 
@@ -880,10 +881,10 @@ void SeasideCache::removeContactData(
     m_contacts[filter].removeAt(row);
 
     if (filter == FilterAll) {
-        const QString group(nameGroup(existingItem(contactId)));
+        const QString group(nameGroup(existingItem(iid)));
         if (!group.isNull()) {
             QSet<QString> modifiedNameGroups;
-            removeFromContactNameGroup(internalId(contactId), group, &modifiedNameGroups);
+            removeFromContactNameGroup(iid, group, &modifiedNameGroups);
             notifyNameGroupsChanged(modifiedNameGroups);
         }
     }
@@ -1702,7 +1703,6 @@ void SeasideCache::contactsAvailable()
 
         for (int i = m_resultsRead; i < contacts.count(); ++i) {
             QContact contact = contacts.at(i);
-            ContactIdType apiId = SeasideCache::apiId(contact);
             quint32 iid = internalId(contact);
 
             CacheItem *item = existingItem(iid);
@@ -1758,7 +1758,7 @@ void SeasideCache::contactsAvailable()
             }
 
             if (roleDataChanged) {
-                instancePtr->contactDataChanged(apiId);
+                instancePtr->contactDataChanged(item->iid);
             }
         }
         m_resultsRead = contacts.count();
@@ -2213,7 +2213,7 @@ void SeasideCache::displayLabelOrderChanged()
             if (newLabel != it->displayLabel) {
                 it->displayLabel = newLabel;
 
-                contactDataChanged(apiId(it->iid));
+                contactDataChanged(it->iid);
                 reportItemUpdated(&*it);
             }
 
