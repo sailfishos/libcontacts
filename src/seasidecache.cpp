@@ -355,7 +355,6 @@ SeasideCache::SeasideCache()
     , m_sortPropertyConf(QLatin1String("/org/nemomobile/contacts/sort_property"))
     , m_groupPropertyConf(QLatin1String("/org/nemomobile/contacts/group_property"))
 #endif
-    , m_resultsRead(0)
     , m_populated(0)
     , m_cacheIndex(0)
     , m_queryIndex(0)
@@ -1310,8 +1309,6 @@ bool SeasideCache::event(QEvent *event)
         m_fetchTypesChanged = false;
         m_populateProgress = RefetchFavorites;
     } else if (!m_changedContacts.isEmpty() && !m_fetchRequest.isActive()) {
-        m_resultsRead = 0;
-
 #ifdef USING_QTPIM
         QContactIdFilter filter;
 #else
@@ -1367,7 +1364,6 @@ bool SeasideCache::event(QEvent *event)
     } else if (m_refreshRequired && !m_contactIdRequest.isActive()) {
         m_refreshRequired = false;
 
-        m_resultsRead = 0;
         m_syncFilter = FilterFavorites;
         m_contactIdRequest.setFilter(favoriteFilter());
         m_contactIdRequest.setSorting(m_sortOrder);
@@ -1740,8 +1736,7 @@ void SeasideCache::contactsAvailable()
         // An update.
         QSet<QString> modifiedGroups;
 
-        for (int i = m_resultsRead; i < contacts.count(); ++i) {
-            QContact contact = contacts.at(i);
+        foreach (QContact contact, contacts) {
             quint32 iid = internalId(contact);
 
             QString oldNameGroup;
@@ -1791,7 +1786,7 @@ void SeasideCache::contactsAvailable()
                 instancePtr->contactDataChanged(item->iid);
             }
         }
-        m_resultsRead = contacts.count();
+
         notifyNameGroupsChanged(modifiedGroups);
     }
 }

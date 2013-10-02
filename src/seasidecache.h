@@ -465,7 +465,6 @@ private:
     MGConfItem m_sortPropertyConf;
     MGConfItem m_groupPropertyConf;
 #endif
-    int m_resultsRead;
     int m_populated;
     int m_cacheIndex;
     int m_queryIndex;
