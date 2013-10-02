@@ -670,6 +670,9 @@ SeasideCache::CacheItem *SeasideCache::itemById(const ContactIdType &id, bool re
     } else {
         // Insert a new item into the cache if the one doesn't exist.
         item = &(instancePtr->m_people[iid]);
+        item->iid = iid;
+        item->contactState = ContactAbsent;
+
 #ifdef USING_QTPIM
         item->contact.setId(id);
 #else
@@ -1688,6 +1691,17 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
     return modified;
 }
 
+void updateDetailsFromCache(QContact &contact, SeasideCache::CacheItem *item, const QSet<DetailTypeId> &queryDetailTypes)
+{
+    // Copy any existing detail types that are in the current record to the new instance
+    foreach (const QContactDetail &existing, item->contact.details()) {
+        if (!queryDetailTypes.contains(detailType(existing))) {
+            QContactDetail copy(existing);
+            contact.saveDetail(&copy);
+        }
+    }
+}
+
 void SeasideCache::contactsAvailable()
 {
     QContactAbstractRequest *request = static_cast<QContactAbstractRequest *>(sender());
@@ -1721,7 +1735,7 @@ void SeasideCache::contactsAvailable()
         FilterType type(m_populateProgress == FetchFavorites ? FilterFavorites
                                                              : (m_populateProgress == FetchMetadata ? FilterAll
                                                                                                     : FilterOnline));
-        appendContacts(contacts, type, partialFetch);
+        appendContacts(contacts, type, partialFetch, queryDetailTypes);
     } else {
         // An update.
         QSet<QString> modifiedGroups;
@@ -1730,30 +1744,21 @@ void SeasideCache::contactsAvailable()
             QContact contact = contacts.at(i);
             quint32 iid = internalId(contact);
 
-            CacheItem *item = existingItem(iid);
+            QString oldNameGroup;
+            QString oldDisplayLabel;
 
-            const bool preexisting = (item != 0);
+            CacheItem *item = existingItem(iid);
             if (!item) {
                 // We haven't seen this contact before
                 item = &(m_people[iid]);
                 item->iid = iid;
-            }
-
-            QString oldNameGroup;
-            QString oldDisplayLabel;
-
-            if (preexisting) {
+            } else {
                 oldNameGroup = item->nameGroup;
                 oldDisplayLabel = item->displayLabel;
 
                 if (partialFetch) {
-                    // Copy any existing detail types that are in the current record to the new instance
-                    foreach (const QContactDetail &existing, item->contact.details()) {
-                        if (!queryDetailTypes.contains(detailType(existing))) {
-                            QContactDetail copy(existing);
-                            contact.saveDetail(&copy);
-                        }
-                    }
+                    // Update our new instance with any details not returned by the current query
+                    updateDetailsFromCache(contact, item, queryDetailTypes);
                 }
             }
 
@@ -1913,7 +1918,7 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
     return end - index + 1;
 }
 
-void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch)
+void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes)
 {
     if (!contacts.isEmpty()) {
         QList<quint32> &cacheIds = m_contacts[filterType];
@@ -1932,21 +1937,24 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
 
             foreach (QContact contact, contacts) {
                 quint32 iid = internalId(contact);
-
                 cacheIds.append(iid);
 
-                CacheItem &cacheItem = m_people[iid];
-
-                // If we have already requested this contact as a favorite, don't update with fewer details
-                if ((cacheItem.iid == 0) ||
-                    (cacheItem.contact.detail<QContactFavorite>().isFavorite() == false)) {
-                    cacheItem.iid = iid;
-                    updateContactIndexing(QContact(), contact, iid, QSet<DetailTypeId>(), &cacheItem);
-                    updateCache(&cacheItem, contact, partialFetch);
+                CacheItem *item = existingItem(iid);
+                if (!item) {
+                    item = &(m_people[iid]);
+                    item->iid = iid;
+                } else {
+                    if (partialFetch) {
+                        // Update our new instance with any details not returned by the current query
+                        updateDetailsFromCache(contact, item, queryDetailTypes);
+                    }
                 }
 
+                updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
+                updateCache(item, contact, partialFetch);
+
                 if (filterType == FilterAll) {
-                    addToContactNameGroup(iid, nameGroup(&cacheItem), &modifiedGroups);
+                    addToContactNameGroup(iid, nameGroup(item), &modifiedGroups);
                 }
             }
 
