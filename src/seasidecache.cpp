@@ -1383,15 +1383,30 @@ bool SeasideCache::event(QEvent *event)
     } else {
         m_updatesPending = false;
 
-        const QHash<ContactIdType,int> expiredContacts = m_expiredContacts;
+        QList<quint32> removeIds;
+
+        QHash<ContactIdType, int>::const_iterator it = m_expiredContacts.constBegin(), end = m_expiredContacts.constEnd();
+        for ( ; it != end; ++it) {
+            if (it.value() < 0) {
+                quint32 iid = internalId(it.key());
+                removeIds.append(iid);
+            }
+        }
         m_expiredContacts.clear();
 
-        typedef QHash<ContactIdType,int>::const_iterator iterator;
-        for (iterator it = expiredContacts.begin(); it != expiredContacts.end(); ++it) {
-            if (*it >= 0)
-                continue;
+        QSet<QString> modifiedGroups;
 
-            quint32 iid = internalId(it.key());
+        // Before removal, ensure none of these contacts are in name groups
+        foreach (quint32 iid, removeIds) {
+            if (CacheItem *item = existingItem(iid)) {
+                removeFromContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
+            }
+        }
+
+        notifyNameGroupsChanged(modifiedGroups);
+
+        // Remove the contacts from the cache
+        foreach (quint32 iid, removeIds) {
             QHash<quint32, CacheItem>::iterator cacheItem = m_people.find(iid);
             if (cacheItem != m_people.end()) {
                 delete cacheItem->itemData;
