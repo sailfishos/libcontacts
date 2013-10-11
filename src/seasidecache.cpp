@@ -883,11 +883,9 @@ void SeasideCache::removeContactData(quint32 iid, FilterType filter)
 
     if (filter == FilterAll) {
         const QString group(nameGroup(existingItem(iid)));
-        if (!group.isNull()) {
-            QSet<QString> modifiedNameGroups;
-            removeFromContactNameGroup(iid, group, &modifiedNameGroups);
-            notifyNameGroupsChanged(modifiedNameGroups);
-        }
+        QSet<QString> modifiedNameGroups;
+        removeFromContactNameGroup(iid, group, &modifiedNameGroups);
+        notifyNameGroupsChanged(modifiedNameGroups);
     }
 
     for (int i = 0; i < models.count(); ++i)
@@ -1803,9 +1801,7 @@ void SeasideCache::contactsAvailable()
             if (item->nameGroup != oldNameGroup) {
                 if (!ignoreContactForNameGroups(item->contact)) {
                     addToContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
-                    if (!oldNameGroup.isNull()) {
-                        removeFromContactNameGroup(item->iid, oldNameGroup, &modifiedGroups);
-                    }
+                    removeFromContactNameGroup(item->iid, oldNameGroup, &modifiedGroups);
                 }
             }
 
@@ -2268,9 +2264,7 @@ void SeasideCache::displayLabelOrderChanged()
             const QString group(determineNameGroup(&*it));
             if (group != it->nameGroup) {
                 if (!ignoreContactForNameGroups(it->contact)) {
-                    if (!it->nameGroup.isNull()) {
-                        removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-                    }
+                    removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
 
                     it->nameGroup = group;
                     addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
@@ -2345,9 +2339,7 @@ void SeasideCache::groupPropertyChanged()
             const QString group(determineNameGroup(&*it));
             if (group != it->nameGroup) {
                 if (!ignoreContactForNameGroups(it->contact)) {
-                    if (!it->nameGroup.isNull()) {
-                        removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-                    }
+                    removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
 
                     it->nameGroup = group;
                     addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
