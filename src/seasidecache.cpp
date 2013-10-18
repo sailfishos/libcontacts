@@ -1093,7 +1093,7 @@ QUrl SeasideCache::filteredAvatarUrl(const QContact &contact, const QStringList 
 QString SeasideCache::normalizePhoneNumber(const QString &input)
 {
     // TODO: use a configuration variable to make this configurable
-    static const int maxCharacters = 7;
+    static const int maxCharacters = QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters;
 
     // If the number if not valid, return null
     QString validated(QtContactsSqliteExtensions::normalizePhoneNumber(input, QtContactsSqliteExtensions::ValidatePhoneNumber));
