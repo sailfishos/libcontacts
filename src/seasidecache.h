@@ -256,6 +256,7 @@ public:
     };
 
     static SeasideCache *instance();
+    static QContactManager *manager();
 
     static ContactIdType apiId(const QContact &contact);
     static ContactIdType apiId(quint32 iid);
@@ -446,7 +447,6 @@ private:
     QList<ListModel *> m_models[FilterTypesCount];
     QSet<QObject *> m_users;
     QHash<ContactIdType,int> m_expiredContacts;
-    QContactManager m_manager;
     QContactFetchRequest m_fetchRequest;
     QContactFetchByIdRequest m_fetchByIdRequest;
 #ifdef USING_QTPIM
@@ -461,6 +461,7 @@ private:
     QContactRelationshipRemoveRequest m_relationshipRemoveRequest;
     QList<QContactSortOrder> m_sortOrder;
     QList<QContactSortOrder> m_onlineSortOrder;
+    FilterType m_syncFilter;
 #ifdef HAS_MLITE
     MGConfItem m_displayLabelOrderConf;
     MGConfItem m_sortPropertyConf;
@@ -471,7 +472,6 @@ private:
     int m_queryIndex;
     int m_fetchProcessedCount;
     int m_fetchByIdProcessedCount;
-    FilterType m_syncFilter;
     DisplayLabelOrder m_displayLabelOrder;
     QString m_sortProperty;
     QString m_groupProperty;

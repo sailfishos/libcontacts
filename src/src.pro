@@ -38,11 +38,13 @@ DEFINES += CONTACTCACHE_BUILD
 
 SOURCES += \
     $$PWD/seasidecache.cpp \
+    $$PWD/seasideimport.cpp \
     $$PWD/seasidephotohandler.cpp
 
 HEADERS += \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
+    $$PWD/seasideimport.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
     $$PWD/seasidephotohandler.h
@@ -50,6 +52,7 @@ HEADERS += \
 headers.files = \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
+    $$PWD/seasideimport.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
     $$PWD/seasidephotohandler.h
