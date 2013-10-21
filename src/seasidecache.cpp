@@ -106,6 +106,8 @@ QString managerName()
             : QString();
 }
 
+Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName()))
+
 typedef QList<DetailTypeId> DetailList;
 
 template<typename T>
@@ -302,6 +304,11 @@ QList<quint32> internalIds(const QList<SeasideCache::ContactIdType> &ids)
 SeasideCache *SeasideCache::instancePtr = 0;
 QStringList SeasideCache::allContactNameGroups = getAllContactNameGroups();
 
+QContactManager* SeasideCache::manager()
+{
+    return ::manager();
+}
+
 SeasideCache* SeasideCache::instance()
 {
     return instancePtr;
@@ -355,7 +362,7 @@ quint32 SeasideCache::internalId(QContactLocalId id)
 #endif
 
 SeasideCache::SeasideCache()
-    : m_manager(managerName())
+    : m_syncFilter(FilterNone)
 #ifdef HAS_MLITE
     , m_displayLabelOrderConf(QLatin1String("/org/nemomobile/contacts/display_label_order"))
     , m_sortPropertyConf(QLatin1String("/org/nemomobile/contacts/sort_property"))
@@ -366,7 +373,6 @@ SeasideCache::SeasideCache()
     , m_queryIndex(0)
     , m_fetchProcessedCount(0)
     , m_fetchByIdProcessedCount(0)
-    , m_syncFilter(FilterNone)
     , m_displayLabelOrder(FirstNameFirst)
     , m_sortProperty(QString::fromLatin1("firstName"))
     , m_groupProperty(QString::fromLatin1("firstName"))
@@ -402,21 +408,23 @@ SeasideCache::SeasideCache()
         m_groupProperty = groupPropertyConf.toString();
 #endif
 
+    QContactManager *mgr(manager());
+
 #ifdef USING_QTPIM
-    connect(&m_manager, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
-    connect(&m_manager, SIGNAL(contactsAdded(QList<QContactId>)),
+    connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
+    connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
-    connect(&m_manager, SIGNAL(contactsChanged(QList<QContactId>)),
+    connect(mgr, SIGNAL(contactsChanged(QList<QContactId>)),
             this, SLOT(contactsChanged(QList<QContactId>)));
-    connect(&m_manager, SIGNAL(contactsRemoved(QList<QContactId>)),
+    connect(mgr, SIGNAL(contactsRemoved(QList<QContactId>)),
             this, SLOT(contactsRemoved(QList<QContactId>)));
 #else
-    connect(&m_manager, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
-    connect(&m_manager, SIGNAL(contactsAdded(QList<QContactLocalId>)),
+    connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
+    connect(mgr, SIGNAL(contactsAdded(QList<QContactLocalId>)),
             this, SLOT(contactsAdded(QList<QContactLocalId>)));
-    connect(&m_manager, SIGNAL(contactsChanged(QList<QContactLocalId>)),
+    connect(mgr, SIGNAL(contactsChanged(QList<QContactLocalId>)),
             this, SLOT(contactsChanged(QList<QContactLocalId>)));
-    connect(&m_manager, SIGNAL(contactsRemoved(QList<QContactLocalId>)),
+    connect(mgr, SIGNAL(contactsRemoved(QList<QContactLocalId>)),
             this, SLOT(contactsRemoved(QList<QContactLocalId>)));
 #endif
 
@@ -442,14 +450,14 @@ SeasideCache::SeasideCache()
     connect(&m_relationshipRemoveRequest, SIGNAL(stateChanged(QContactAbstractRequest::State)),
             this, SLOT(requestStateChanged(QContactAbstractRequest::State)));
 
-    m_fetchRequest.setManager(&m_manager);
-    m_fetchByIdRequest.setManager(&m_manager);
-    m_contactIdRequest.setManager(&m_manager);
-    m_relationshipsFetchRequest.setManager(&m_manager);
-    m_removeRequest.setManager(&m_manager);
-    m_saveRequest.setManager(&m_manager);
-    m_relationshipSaveRequest.setManager(&m_manager);
-    m_relationshipRemoveRequest.setManager(&m_manager);
+    m_fetchRequest.setManager(mgr);
+    m_fetchByIdRequest.setManager(mgr);
+    m_contactIdRequest.setManager(mgr);
+    m_relationshipsFetchRequest.setManager(mgr);
+    m_removeRequest.setManager(mgr);
+    m_saveRequest.setManager(mgr);
+    m_relationshipSaveRequest.setManager(mgr);
+    m_relationshipRemoveRequest.setManager(mgr);
 
     setSortOrder(m_sortProperty);
 }
@@ -815,7 +823,7 @@ SeasideCache::CacheItem *SeasideCache::resolveOnlineAccount(ResolveListener *lis
 
 SeasideCache::ContactIdType SeasideCache::selfContactId()
 {
-    return instancePtr->m_manager.selfContactId();
+    return manager()->selfContactId();
 }
 
 void SeasideCache::requestUpdate()
@@ -1934,7 +1942,7 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
     QList<quint32> &cacheIds = m_contacts[filter];
     QList<ListModel *> &models = m_models[filter];
 
-    const quint32 selfId = internalId(m_manager.selfContactId());
+    const quint32 selfId = internalId(manager()->selfContactId());
 
     int end = index + count - 1;
     for (int i = 0; i < models.count(); ++i)
@@ -2435,7 +2443,7 @@ QString SeasideCache::exportContacts()
     QList<ContactIdType> contactsToFetch;
     contactsToFetch.reserve(instancePtr->m_people.count());
 
-    const quint32 selfId = internalId(instancePtr->m_manager.selfContactId());
+    const quint32 selfId = internalId(manager()->selfContactId());
 
     typedef QHash<quint32, CacheItem>::iterator iterator;
     for (iterator it = instancePtr->m_people.begin(); it != instancePtr->m_people.end(); ++it) {
@@ -2449,7 +2457,7 @@ QString SeasideCache::exportContacts()
     }
 
     if (!contactsToFetch.isEmpty()) {
-        QList<QContact> fetchedContacts = instancePtr->m_manager.contacts(contactsToFetch);
+        QList<QContact> fetchedContacts = manager()->contacts(contactsToFetch);
         contacts.append(fetchedContacts);
     }
 
