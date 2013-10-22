@@ -583,13 +583,9 @@ void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
         new SeasideCache;
     instancePtr->m_nameGrouper.reset(grouper);
 
-    allContactNameGroups = getAllContactNameGroups();
-    QStringList groups = instancePtr->m_nameGrouper->allNameGroups();
-    for (int i = groups.count() - 1; i > -1; --i) {
-        const QString &group = groups.at(i);
-        if (!allContactNameGroups.contains(group))
-            allContactNameGroups.prepend(group);
-    }
+    allContactNameGroups = instancePtr->m_nameGrouper->allNameGroups();
+    if (!allContactNameGroups.contains(QLatin1String("#")))
+        allContactNameGroups << QLatin1String("#");
 }
 
 QString SeasideCache::nameGroup(const CacheItem *cacheItem)
@@ -607,7 +603,7 @@ QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
 
     if (!instancePtr->m_nameGrouper.isNull()) {
         QString group = instancePtr->m_nameGrouper->nameGroupForContact(cacheItem->contact, instancePtr->m_groupProperty);
-        if (!group.isNull()) {
+        if (!group.isNull() && allContactNameGroups.contains(group)) {
             return group;
         }
     }
