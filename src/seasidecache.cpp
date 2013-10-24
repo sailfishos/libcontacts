@@ -2319,8 +2319,21 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             // Result of a specific query
             if (m_activeResolve) {
                 CacheItem *item = 0;
-                if (!m_fetchRequest.contacts().isEmpty()) {
-                    item = itemById(apiId(m_fetchRequest.contacts().first()), false);
+                const QList<QContact> &resolvedContacts(m_fetchRequest.contacts());
+                if (!resolvedContacts.isEmpty()) {
+                    if (resolvedContacts.count() == 1) {
+                        item = itemById(apiId(resolvedContacts.first()), false);
+                    } else {
+                        // Lookup the result in our updated indexes
+                        ResolveData data(*m_activeResolve);
+                        if (data.first == QString()) {
+                            item = itemByPhoneNumber(data.second, false);
+                        } else if (data.second == QString()) {
+                            item = itemByEmailAddress(data.first, false);
+                        } else {
+                            item = itemByOnlineAccount(data.first, data.second, false);
+                        }
+                    }
                 } else {
                     // This address is unknown - keep it for later resolution
                     ResolveData data(*m_activeResolve);
