@@ -325,6 +325,8 @@ QString::const_iterator firstDtmfChar(QString::const_iterator it, QString::const
     return end;
 }
 
+const int ExactMatch = 100;
+
 int matchLength(const QString &lhs, const QString &rhs)
 {
     if (lhs.isEmpty() || rhs.isEmpty())
@@ -348,8 +350,14 @@ int matchLength(const QString &lhs, const QString &rhs)
         --lit;
         --rit;
         if ((lit == lbegin) || (rit == rbegin)) {
-            if (*lit == *rit)
+            if (*lit == *rit) {
                 ++matchLength;
+
+                if ((lit == lbegin) && (rit == rbegin)) {
+                    // We have a complete, exact match - this must be the best match
+                    return ExactMatch;
+                }
+            }
             break;
         }
     }
@@ -376,6 +384,9 @@ int bestPhoneNumberMatchLength(const QContact &contact, const QString &match)
 
     foreach (const QContactPhoneNumber& phone, contact.details<QContactPhoneNumber>()) {
         bestMatchLength = qMax(bestMatchLength, matchLength(SeasideCache::normalizePhoneNumber(phone.number()), match));
+        if (bestMatchLength == ExactMatch) {
+            return ExactMatch;
+        }
     }
 
     return bestMatchLength;
@@ -2769,6 +2780,8 @@ SeasideCache::CacheItem *SeasideCache::itemMatchingPhoneNumber(const QString &nu
                 if (matchLength > bestMatchLength) {
                     bestMatchLength = matchLength;
                     matchItem = item;
+                    if (bestMatchLength == ExactMatch)
+                        break;
                 }
             }
         }
