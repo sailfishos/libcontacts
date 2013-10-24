@@ -339,32 +339,43 @@ int matchLength(const QString &lhs, const QString &rhs)
     QString::const_iterator ldtmf = firstDtmfChar(lbegin, lend);
     QString::const_iterator rdtmf = firstDtmfChar(rbegin, rend);
 
-    // Start match length calculation at the last non-DTMF digit
-    QString::const_iterator lit = ldtmf - 1;
-    QString::const_iterator rit = rdtmf - 1;
-
+    QString::const_iterator lit, rit;
+    bool processDtmf = false;
     int matchLength = 0;
-    while (*lit == *rit) {
-        ++matchLength;
 
-        --lit;
-        --rit;
-        if ((lit == lbegin) || (rit == rbegin)) {
-            if (*lit == *rit) {
-                ++matchLength;
+    if ((ldtmf != lbegin) && (rdtmf != rbegin)) {
+        // Start match length calculation at the last non-DTMF digit
+        lit = ldtmf - 1;
+        rit = rdtmf - 1;
 
-                if ((lit == lbegin) && (rit == rbegin)) {
-                    // We have a complete, exact match - this must be the best match
-                    return ExactMatch;
+        while (*lit == *rit) {
+            ++matchLength;
+
+            --lit;
+            --rit;
+            if ((lit == lbegin) || (rit == rbegin)) {
+                if (*lit == *rit) {
+                    ++matchLength;
+
+                    if ((lit == lbegin) && (rit == rbegin)) {
+                        // We have a complete, exact match - this must be the best match
+                        return ExactMatch;
+                    } else {
+                        // We matched all of one number - continue looking in the DTMF part
+                        processDtmf = true;
+                    }
                 }
+                break;
             }
-            break;
         }
+    } else {
+        // Process the DTMF section for a match
+        processDtmf = true;
     }
 
     // Have we got a match?
     if ((matchLength >= QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters) ||
-        ((lit == lbegin) || (rit == rbegin))) {
+        processDtmf) {
         // See if the match continues into the DTMF area
         QString::const_iterator lit = ldtmf;
         QString::const_iterator rit = rdtmf;
