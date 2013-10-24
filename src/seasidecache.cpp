@@ -252,9 +252,24 @@ QContactFilter aggregateFilter()
 
 typedef QPair<QString, QString> StringPair;
 
-StringPair addressPair(const QContactPhoneNumber &phoneNumber)
+QList<StringPair> addressPairs(const QContactPhoneNumber &phoneNumber)
 {
-    return qMakePair(QString(), SeasideCache::minimizePhoneNumber(phoneNumber.number()));
+    QList<StringPair> rv;
+
+    const QString normalized(SeasideCache::normalizePhoneNumber(phoneNumber.number()));
+    if (!normalized.isEmpty()) {
+        const QChar plus(QChar::fromLatin1('+'));
+        if (normalized.startsWith(plus)) {
+            // Also index the complete form of this number
+            rv.append(qMakePair(QString(), normalized));
+        }
+
+        // Always index the minimized form of the number
+        const QString minimized(SeasideCache::minimizePhoneNumber(normalized));
+        rv.append(qMakePair(QString(), minimized));
+    }
+
+    return rv;
 }
 
 StringPair addressPair(const QContactEmailAddress &emailAddress)
@@ -822,45 +837,19 @@ void SeasideCache::refreshContact(CacheItem *cacheItem)
 
 SeasideCache::CacheItem *SeasideCache::itemByPhoneNumber(const QString &number, bool requireComplete)
 {
-    QString minimizedNumber = minimizePhoneNumber(number);
+    const QString normalized(normalizePhoneNumber(number));
+    if (normalized.isEmpty())
+        return 0;
 
-    QMultiHash<QString, quint32>::const_iterator it = instancePtr->m_phoneNumberIds.find(minimizedNumber);
-    QMultiHash<QString, quint32>::const_iterator end = instancePtr->m_phoneNumberIds.constEnd();
-    if (it != end) {
-        // How many matches are there for this number?
-        int matchCount = 1;
-        QMultiHash<QString, quint32>::const_iterator matchingIt = it + 1;
-        while ((matchingIt != end) && (matchingIt.key() == minimizedNumber)) {
-             ++matchCount;
-             ++matchingIt;
-        }
-        if (matchCount == 1)
-            return itemById(*it, requireComplete);
-
-        QString normalizedNumber = normalizePhoneNumber(number);
-
-        // Choose the best match from these contacts
-        int bestMatchLength = 0;
-        CacheItem *matchItem = 0;
-        for ( ; matchCount > 0; ++it, --matchCount) {
-            if (CacheItem *item = existingItem(*it)) {
-                int matchLength = bestPhoneNumberMatchLength(item->contact, normalizedNumber);
-                if (matchLength > bestMatchLength) {
-                    bestMatchLength = matchLength;
-                    matchItem = item;
-                }
-            }
-        }
-
-        if (matchItem != 0) {
-            if (requireComplete) {
-                ensureCompletion(matchItem);
-            }
-            return matchItem;
+    const QChar plus(QChar::fromLatin1('+'));
+    if (normalized.startsWith(plus)) {
+        // See if there is a match for the complete form of this number
+        if (CacheItem *item = instancePtr->itemMatchingPhoneNumber(normalized, normalized, requireComplete)) {
+            return item;
         }
     }
 
-    return 0;
+    return instancePtr->itemMatchingPhoneNumber(minimizePhoneNumber(normalized), normalized, requireComplete);
 }
 
 SeasideCache::CacheItem *SeasideCache::itemByEmailAddress(const QString &email, bool requireComplete)
@@ -1757,24 +1746,26 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
     if (queryDetailTypes.isEmpty() || queryDetailTypes.contains(detailType<QContactPhoneNumber>())) {
         // Addresses which are no longer in the contact should be de-indexed
         foreach (const QContactPhoneNumber &phoneNumber, oldContact.details<QContactPhoneNumber>()) {
-            const StringPair address(addressPair(phoneNumber));
-            if (validAddressPair(address))
-                oldAddresses.insert(address);
+            foreach (const StringPair &address, addressPairs(phoneNumber)) {
+                if (validAddressPair(address))
+                    oldAddresses.insert(address);
+            }
         }
 
         // Update our address indexes for any address details in this contact
         foreach (const QContactPhoneNumber &phoneNumber, contact.details<QContactPhoneNumber>()) {
-            const StringPair address(addressPair(phoneNumber));
-            if (!validAddressPair(address))
-                continue;
+            foreach (const StringPair &address, addressPairs(phoneNumber)) {
+                if (!validAddressPair(address))
+                    continue;
 
-            if (!oldAddresses.remove(address)) {
-                // This address was not previously recorded
-                modified = true;
-                resolveUnknownAddresses(address.first, address.second, item);
+                if (!oldAddresses.remove(address)) {
+                    // This address was not previously recorded
+                    modified = true;
+                    resolveUnknownAddresses(address.first, address.second, item);
+                }
+
+                m_phoneNumberIds.insert(address.second, iid);
             }
-
-            m_phoneNumberIds.insert(address.second, iid);
         }
 
         // Remove any addresses no longer available for this contact
@@ -2735,6 +2726,44 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
 
     m_resolveAddresses.append(data);
     requestUpdate();
+}
+
+SeasideCache::CacheItem *SeasideCache::itemMatchingPhoneNumber(const QString &number, const QString &normalized, bool requireComplete)
+{
+    QMultiHash<QString, quint32>::const_iterator it = m_phoneNumberIds.find(number), end = m_phoneNumberIds.constEnd();
+    if (it != end) {
+        // How many matches are there for this number?
+        int matchCount = 1;
+        QMultiHash<QString, quint32>::const_iterator matchingIt = it + 1;
+        while ((matchingIt != end) && (matchingIt.key() == number)) {
+             ++matchCount;
+             ++matchingIt;
+        }
+        if (matchCount == 1)
+            return itemById(*it, requireComplete);
+
+        // Choose the best match from these contacts
+        int bestMatchLength = 0;
+        CacheItem *matchItem = 0;
+        for ( ; matchCount > 0; ++it, --matchCount) {
+            if (CacheItem *item = existingItem(*it)) {
+                int matchLength = bestPhoneNumberMatchLength(item->contact, normalized);
+                if (matchLength > bestMatchLength) {
+                    bestMatchLength = matchLength;
+                    matchItem = item;
+                }
+            }
+        }
+
+        if (matchItem != 0) {
+            if (requireComplete) {
+                ensureCompletion(matchItem);
+            }
+            return matchItem;
+        }
+    }
+
+    return 0;
 }
 
 int SeasideCache::contactIndex(quint32 iid, FilterType filterType)

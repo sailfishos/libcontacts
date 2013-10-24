@@ -418,6 +418,8 @@ private:
 
     void resolveAddress(ResolveListener *listener, const QString &first, const QString &second, bool requireComplete);
 
+    CacheItem *itemMatchingPhoneNumber(const QString &number, const QString &normalized, bool requireComplete);
+
     int contactIndex(quint32 iid, FilterType filter);
 
     static QContactRelationship makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2);
