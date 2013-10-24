@@ -342,6 +342,7 @@ public:
     static QUrl filteredAvatarUrl(const QContact &contact, const QStringList &metadataFragments = QStringList());
 
     static QString normalizePhoneNumber(const QString &input);
+    static QString minimizePhoneNumber(const QString &input);
 
     bool event(QEvent *event);
 
@@ -426,7 +427,7 @@ private:
     QBasicTimer m_expiryTimer;
     QBasicTimer m_fetchTimer;
     QHash<quint32, CacheItem> m_people;
-    QHash<QString, quint32> m_phoneNumberIds;
+    QMultiHash<QString, quint32> m_phoneNumberIds;
     QHash<QString, quint32> m_emailAddressIds;
     QHash<QPair<QString, QString>, quint32> m_onlineAccountIds;
     QHash<ContactIdType, QContact> m_contactsToSave;

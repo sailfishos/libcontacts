@@ -254,7 +254,7 @@ typedef QPair<QString, QString> StringPair;
 
 StringPair addressPair(const QContactPhoneNumber &phoneNumber)
 {
-    return qMakePair(QString(), SeasideCache::normalizePhoneNumber(phoneNumber.number()));
+    return qMakePair(QString(), SeasideCache::minimizePhoneNumber(phoneNumber.number()));
 }
 
 StringPair addressPair(const QContactEmailAddress &emailAddress)
@@ -297,6 +297,73 @@ QList<quint32> internalIds(const QList<SeasideCache::ContactIdType> &ids)
     }
 
     return rv;
+}
+
+QString::const_iterator firstDtmfChar(QString::const_iterator it, QString::const_iterator end)
+{
+    static const QString dtmfChars(QString::fromLatin1("pPwWxX#*"));
+
+    for ( ; it != end; ++it) {
+        if (dtmfChars.contains(*it))
+            return it;
+    }
+    return end;
+}
+
+int matchLength(const QString &lhs, const QString &rhs)
+{
+    if (lhs.isEmpty() || rhs.isEmpty())
+        return 0;
+
+    QString::const_iterator lbegin = lhs.constBegin(), lend = lhs.constEnd();
+    QString::const_iterator rbegin = rhs.constBegin(), rend = rhs.constEnd();
+
+    // Do these numbers contain DTMF elements?
+    QString::const_iterator ldtmf = firstDtmfChar(lbegin, lend);
+    QString::const_iterator rdtmf = firstDtmfChar(rbegin, rend);
+
+    // Start match length calculation at the last non-DTMF digit
+    QString::const_iterator lit = ldtmf - 1;
+    QString::const_iterator rit = rdtmf - 1;
+
+    int matchLength = 0;
+    while (*lit == *rit) {
+        ++matchLength;
+
+        --lit;
+        --rit;
+        if ((lit == lbegin) || (rit == rbegin)) {
+            if (*lit == *rit)
+                ++matchLength;
+            break;
+        }
+    }
+
+    // Have we got a match?
+    if ((matchLength >= QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters) ||
+        ((lit == lbegin) || (rit == rbegin))) {
+        // See if the match continues into the DTMF area
+        QString::const_iterator lit = ldtmf;
+        QString::const_iterator rit = rdtmf;
+        for ( ; (lit != lend) && (rit != rend); ++lit, ++rit) {
+            if ((*lit).toLower() != (*rit).toLower())
+                break;
+            ++matchLength;
+        }
+    }
+
+    return matchLength;
+}
+
+int bestPhoneNumberMatchLength(const QContact &contact, const QString &match)
+{
+    int bestMatchLength = 0;
+
+    foreach (const QContactPhoneNumber& phone, contact.details<QContactPhoneNumber>()) {
+        bestMatchLength = qMax(bestMatchLength, matchLength(SeasideCache::normalizePhoneNumber(phone.number()), match));
+    }
+
+    return bestMatchLength;
 }
 
 }
@@ -755,10 +822,43 @@ void SeasideCache::refreshContact(CacheItem *cacheItem)
 
 SeasideCache::CacheItem *SeasideCache::itemByPhoneNumber(const QString &number, bool requireComplete)
 {
-    QString normalizedNumber = normalizePhoneNumber(number);
-    QHash<QString, quint32>::const_iterator it = instancePtr->m_phoneNumberIds.find(normalizedNumber);
-    if (it != instancePtr->m_phoneNumberIds.end())
-        return itemById(*it, requireComplete);
+    QString minimizedNumber = minimizePhoneNumber(number);
+
+    QMultiHash<QString, quint32>::const_iterator it = instancePtr->m_phoneNumberIds.find(minimizedNumber);
+    QMultiHash<QString, quint32>::const_iterator end = instancePtr->m_phoneNumberIds.constEnd();
+    if (it != end) {
+        // How many matches are there for this number?
+        int matchCount = 1;
+        QMultiHash<QString, quint32>::const_iterator matchingIt = it + 1;
+        while ((matchingIt != end) && (matchingIt.key() == minimizedNumber)) {
+             ++matchCount;
+             ++matchingIt;
+        }
+        if (matchCount == 1)
+            return itemById(*it, requireComplete);
+
+        QString normalizedNumber = normalizePhoneNumber(number);
+
+        // Choose the best match from these contacts
+        int bestMatchLength = 0;
+        CacheItem *matchItem = 0;
+        for ( ; matchCount > 0; ++it, --matchCount) {
+            if (CacheItem *item = existingItem(*it)) {
+                int matchLength = bestPhoneNumberMatchLength(item->contact, normalizedNumber);
+                if (matchLength > bestMatchLength) {
+                    bestMatchLength = matchLength;
+                    matchItem = item;
+                }
+            }
+        }
+
+        if (matchItem != 0) {
+            if (requireComplete) {
+                ensureCompletion(matchItem);
+            }
+            return matchItem;
+        }
+    }
 
     return 0;
 }
@@ -1096,15 +1196,24 @@ QUrl SeasideCache::filteredAvatarUrl(const QContact &contact, const QStringList 
 
 QString SeasideCache::normalizePhoneNumber(const QString &input)
 {
-    // TODO: use a configuration variable to make this configurable
-    static const int maxCharacters = QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters;
+    const QtContactsSqliteExtensions::NormalizePhoneNumberFlags normalizeFlags(QtContactsSqliteExtensions::KeepPhoneNumberDialString |
+                                                                               QtContactsSqliteExtensions::ValidatePhoneNumber);
 
     // If the number if not valid, return null
-    QString validated(QtContactsSqliteExtensions::normalizePhoneNumber(input, QtContactsSqliteExtensions::ValidatePhoneNumber));
+    return QtContactsSqliteExtensions::normalizePhoneNumber(input, normalizeFlags);
+}
+
+QString SeasideCache::minimizePhoneNumber(const QString &input)
+{
+    // TODO: use a configuration variable to make this configurable
+    const int maxCharacters = QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters;
+
+    // If the number if not valid, return null
+    QString validated(normalizePhoneNumber(input));
     if (validated.isNull())
         return validated;
 
-    return QtContactsSqliteExtensions::minimizePhoneNumber(input, maxCharacters);
+    return QtContactsSqliteExtensions::minimizePhoneNumber(validated, maxCharacters);
 }
 
 static QContactFilter filterForMergeCandidates(const QContact &contact)
@@ -1665,14 +1774,14 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
                 resolveUnknownAddresses(address.first, address.second, item);
             }
 
-            m_phoneNumberIds[address.second] = iid;
+            m_phoneNumberIds.insert(address.second, iid);
         }
 
         // Remove any addresses no longer available for this contact
         if (!oldAddresses.isEmpty()) {
             modified = true;
             foreach (const StringPair &address, oldAddresses) {
-                m_phoneNumberIds.remove(address.second);
+                m_phoneNumberIds.remove(address.second, iid);
             }
             oldAddresses.clear();
         }
@@ -2216,8 +2325,8 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
                     // This address is unknown - keep it for later resolution
                     ResolveData data(*m_activeResolve);
                     if (data.first == QString()) {
-                        // Compare this phone number in normalized form
-                        data.compare = normalizePhoneNumber(data.second);
+                        // Compare this phone number in minimized form
+                        data.compare = minimizePhoneNumber(data.second);
                     } else if (data.second == QString()) {
                         // Compare this email address in lowercased form
                         data.compare = data.first.toLower();
