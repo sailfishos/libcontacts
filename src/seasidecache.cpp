@@ -849,7 +849,15 @@ SeasideCache::CacheItem *SeasideCache::itemByPhoneNumber(const QString &number, 
         }
     }
 
-    return instancePtr->itemMatchingPhoneNumber(minimizePhoneNumber(normalized), normalized, requireComplete);
+    const QString minimized(minimizePhoneNumber(normalized));
+    if (((instancePtr->m_fetchTypes & SeasideCache::FetchPhoneNumber) == 0) &&
+        !instancePtr->m_resolvedPhoneNumbers.contains(minimized)) {
+        // We haven't previously queried this number, so there may be more matches than any
+        // that we already have cached; return 0 to force a query
+        return 0;
+    }
+
+    return instancePtr->itemMatchingPhoneNumber(minimized, normalized, requireComplete);
 }
 
 SeasideCache::CacheItem *SeasideCache::itemByEmailAddress(const QString &email, bool requireComplete)
@@ -2309,6 +2317,11 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         } else {
             // Result of a specific query
             if (m_activeResolve) {
+                if (m_activeResolve->first == QString()) {
+                    // We have now queried this phone number
+                    m_resolvedPhoneNumbers.insert(minimizePhoneNumber(m_activeResolve->second));
+                }
+
                 CacheItem *item = 0;
                 const QList<QContact> &resolvedContacts(m_fetchRequest.contacts());
                 if (!resolvedContacts.isEmpty()) {
@@ -2611,6 +2624,11 @@ void SeasideCache::keepPopulated(quint32 fetchTypes)
         m_fetchTypes |= fetchTypes;
         m_fetchTypesChanged = true;
         requestUpdate();
+
+        if ((m_fetchTypes & SeasideCache::FetchPhoneNumber) != 0) {
+            // We don't need to check resolved numbers any further
+            m_resolvedPhoneNumbers.clear();
+        }
     }
 
     if (!m_keepPopulated) {

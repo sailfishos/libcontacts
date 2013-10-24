@@ -498,6 +498,7 @@ private:
     QList<ResolveData> m_resolveAddresses;
     QList<ResolveData> m_unknownAddresses;
     const ResolveData *m_activeResolve;
+    QSet<QString> m_resolvedPhoneNumbers;
 
     QElapsedTimer m_timer;
     QElapsedTimer m_fetchPostponed;
