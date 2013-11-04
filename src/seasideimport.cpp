@@ -306,13 +306,15 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
     QList<QContact> importedContacts(importer.contacts());
 
+    QList<QList<QContact>::iterator> obsoleteContacts;
+
     QHash<QString, QList<QContact>::iterator> importGuids;
     QHash<QString, QList<QContact>::iterator> importNames;
     QHash<QString, QList<QContact>::iterator> importLabels;
 
     // Merge any duplicates in the import list
-    QList<QContact>::iterator it = importedContacts.begin();
-    while (it != importedContacts.end()) {
+    QList<QContact>::iterator it = importedContacts.begin(), end = importedContacts.end();
+    for ( ; it != end; ++it) {
         QContact &contact(*it);
 
         const QString guid = contact.detail<QContactGuid>().guid();
@@ -345,7 +347,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         if (previous) {
             // Combine these duplicate contacts
             mergeIntoExistingContact(previous, contact);
-            it = importedContacts.erase(it);
+            obsoleteContacts.prepend(it);
         } else {
             if (!guid.isEmpty()) {
                 importGuids.insert(guid, it);
@@ -360,9 +362,12 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
                 nickname.setNickname(label);
                 contact.saveDetail(&nickname);
             }
-
-            ++it;
         }
+    }
+
+    // Remove contacts whose details were merged into other contacts
+    foreach (QList<QContact>::iterator it, obsoleteContacts) {
+        importedContacts.erase(it);
     }
 
     // Find all names and GUIDs for local contacts that might match these contacts
@@ -398,8 +403,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     QMap<QContactId, QList<QContact>::iterator> existingIds;
     QList<QList<QContact>::iterator> duplicates;
 
-    QList<QContact>::iterator end = importedContacts.end();
-    for (it = importedContacts.begin(); it != end; ++it) {
+    for (it = importedContacts.begin(), end = importedContacts.end(); it != end; ++it) {
         const QString guid = (*it).detail<QContactGuid>().guid();
 
         QContactId existingId;
