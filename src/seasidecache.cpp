@@ -1151,11 +1151,12 @@ QString SeasideCache::generateDisplayLabelFromNonNameDetails(const QContact &con
 
 static bool avatarUrlWithMetadata(const QContact &contact, QUrl &matchingUrl, const QString &metadataFragment = QString())
 {
+    static const QString coverMetadata(QString::fromLatin1("cover"));
     static const QString localMetadata(QString::fromLatin1("local"));
     static const QString fileScheme(QString::fromLatin1("file"));
 
+    int fallbackScore = 0;
     QUrl fallbackUrl;
-    QUrl remoteFallbackUrl;
 
     QList<QContactAvatar> avatarDetails = contact.details<QContactAvatar>();
     for (int i = 0; i < avatarDetails.size(); ++i) {
@@ -1174,20 +1175,24 @@ static bool avatarUrlWithMetadata(const QContact &contact, QUrl &matchingUrl, co
             matchingUrl = avatarImageUrl;
             return true;
         } else {
-            // queue it as fallback - prefer local file system images over remote, if possible
+            // queue it as fallback if its score is better than the best fallback seen so far.
+            // prefer local file system images over remote urls, and prefer normal avatars
+            // over "cover" (background image) type avatars.
             const bool remote(!avatarImageUrl.scheme().isEmpty() && avatarImageUrl.scheme() != fileScheme);
-            QUrl &url(remote ? remoteFallbackUrl : fallbackUrl);
-            if (url.isEmpty()) {
-                url = avatarImageUrl;
+            int score = remote ? 3 : 4;
+            if (metadata == coverMetadata) {
+                score -= 2;
+            }
+
+            if (score > fallbackScore) {
+                fallbackUrl = avatarImageUrl;
+                fallbackScore = score;
             }
         }
     }
 
     if (!fallbackUrl.isEmpty()) {
         matchingUrl = fallbackUrl;
-        return true;
-    } else if (!remoteFallbackUrl.isEmpty()) {
-        matchingUrl = remoteFallbackUrl;
         return true;
     }
 
