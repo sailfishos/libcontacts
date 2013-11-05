@@ -289,6 +289,19 @@ bool updateExistingContact(QContact *updateContact, const QContact &contact)
     return mergeIntoExistingContact(updateContact, importedContact);
 }
 
+void setNickname(QContact &contact, const QString &text)
+{
+    foreach (const QContactNickname &nick, contact.details<QContactNickname>()) {
+        if (nick.nickname() == text) {
+            return;
+        }
+    }
+
+    QContactNickname nick;
+    nick.setNickname(text);
+    contact.saveDetail(&nick);
+}
+
 }
 
 QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> &details, int *newCount, int *updatedCount)
@@ -306,13 +319,15 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
     QList<QContact> importedContacts(importer.contacts());
 
+    QList<QList<QContact>::iterator> obsoleteContacts;
+
     QHash<QString, QList<QContact>::iterator> importGuids;
     QHash<QString, QList<QContact>::iterator> importNames;
     QHash<QString, QList<QContact>::iterator> importLabels;
 
     // Merge any duplicates in the import list
-    QList<QContact>::iterator it = importedContacts.begin();
-    while (it != importedContacts.end()) {
+    QList<QContact>::iterator it = importedContacts.begin(), end = importedContacts.end();
+    for ( ; it != end; ++it) {
         QContact &contact(*it);
 
         const QString guid = contact.detail<QContactGuid>().guid();
@@ -323,20 +338,20 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         QContact *previous = 0;
         QHash<QString, QList<QContact>::iterator>::const_iterator git = importGuids.find(guid);
         if (git != importGuids.end()) {
-            QContact &contact(*(git.value()));
-            previous = &contact;
+            QContact &guidContact(*(git.value()));
+            previous = &guidContact;
         } else {
             QHash<QString, QList<QContact>::iterator>::const_iterator nit = importNames.find(name);
             if (nit != importNames.end()) {
-                QContact &contact(*(nit.value()));
-                previous = &contact;
+                QContact &nameContact(*(nit.value()));
+                previous = &nameContact;
             } else {
                 // Only if name is empty, use displayLabel - probably SIM import
                 if (emptyName) {
                     QHash<QString, QList<QContact>::iterator>::const_iterator lit = importLabels.find(label);
                     if (lit != importLabels.end()) {
-                        QContact &contact(*(lit.value()));
-                        previous = &contact;
+                        QContact &labelContact(*(lit.value()));
+                        previous = &labelContact;
                     }
                 }
             }
@@ -345,7 +360,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         if (previous) {
             // Combine these duplicate contacts
             mergeIntoExistingContact(previous, contact);
-            it = importedContacts.erase(it);
+            obsoleteContacts.prepend(it);
         } else {
             if (!guid.isEmpty()) {
                 importGuids.insert(guid, it);
@@ -356,13 +371,14 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
                 importLabels.insert(label, it);
 
                 // Modify this contact to have the label as a nickname
-                QContactNickname nickname;
-                nickname.setNickname(label);
-                contact.saveDetail(&nickname);
+                setNickname(contact, label);
             }
-
-            ++it;
         }
+    }
+
+    // Remove contacts whose details were merged into other contacts
+    foreach (QList<QContact>::iterator it, obsoleteContacts) {
+        importedContacts.erase(it);
     }
 
     // Find all names and GUIDs for local contacts that might match these contacts
@@ -398,8 +414,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     QMap<QContactId, QList<QContact>::iterator> existingIds;
     QList<QList<QContact>::iterator> duplicates;
 
-    QList<QContact>::iterator end = importedContacts.end();
-    for (it = importedContacts.begin(); it != end; ++it) {
+    for (it = importedContacts.begin(), end = importedContacts.end(); it != end; ++it) {
         const QString guid = (*it).detail<QContactGuid>().guid();
 
         QContactId existingId;
