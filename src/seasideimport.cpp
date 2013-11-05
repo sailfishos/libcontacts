@@ -338,20 +338,20 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         QContact *previous = 0;
         QHash<QString, QList<QContact>::iterator>::const_iterator git = importGuids.find(guid);
         if (git != importGuids.end()) {
-            QContact &contact(*(git.value()));
-            previous = &contact;
+            QContact &guidContact(*(git.value()));
+            previous = &guidContact;
         } else {
             QHash<QString, QList<QContact>::iterator>::const_iterator nit = importNames.find(name);
             if (nit != importNames.end()) {
-                QContact &contact(*(nit.value()));
-                previous = &contact;
+                QContact &nameContact(*(nit.value()));
+                previous = &nameContact;
             } else {
                 // Only if name is empty, use displayLabel - probably SIM import
                 if (emptyName) {
                     QHash<QString, QList<QContact>::iterator>::const_iterator lit = importLabels.find(label);
                     if (lit != importLabels.end()) {
-                        QContact &contact(*(lit.value()));
-                        previous = &contact;
+                        QContact &labelContact(*(lit.value()));
+                        previous = &labelContact;
                     }
                 }
             }
