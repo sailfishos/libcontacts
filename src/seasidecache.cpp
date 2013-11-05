@@ -943,9 +943,10 @@ SeasideCache::ContactIdType SeasideCache::selfContactId()
 
 void SeasideCache::requestUpdate()
 {
-    if (!m_updatesPending)
+    if (!m_updatesPending) {
         QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
-    m_updatesPending = true;
+        m_updatesPending = true;
+    }
 }
 
 bool SeasideCache::saveContact(const QContact &contact)
@@ -1462,13 +1463,22 @@ bool SeasideCache::event(QEvent *event)
         m_fetchTypesChanged = false;
         m_populateProgress = RefetchFavorites;
     } else if (!m_changedContacts.isEmpty() && !m_fetchRequest.isActive()) {
+        // If we request too many IDs we will exceed the SQLite bound variables limit
+        // The actual limit is over 800, but we should reduce further to increase interactivity
+        const int maxRequestIds = 200;
+
 #ifdef USING_QTPIM
         QContactIdFilter filter;
 #else
         QContactLocalIdFilter filter;
 #endif
-        filter.setIds(m_changedContacts);
-        m_changedContacts.clear();
+        if (m_changedContacts.count() > maxRequestIds) {
+            filter.setIds(m_changedContacts.mid(0, maxRequestIds));
+            m_changedContacts = m_changedContacts.mid(maxRequestIds);
+        } else {
+            filter.setIds(m_changedContacts);
+            m_changedContacts.clear();
+        }
 
         // A local ID filter will fetch all contacts, rather than just aggregates;
         // we only want to retrieve aggregate contacts that have changed
@@ -2686,7 +2696,7 @@ void SeasideCache::disaggregateContacts(const QContact &contact1, const QContact
         saveContact(c);
     }
 
-    QCoreApplication::postEvent(instancePtr, new QEvent(QEvent::UpdateRequest));
+    instancePtr->requestUpdate();
 }
 
 void SeasideCache::updateConstituentAggregations(const ContactIdType &contactId)
