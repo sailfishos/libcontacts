@@ -289,6 +289,19 @@ bool updateExistingContact(QContact *updateContact, const QContact &contact)
     return mergeIntoExistingContact(updateContact, importedContact);
 }
 
+void setNickname(QContact &contact, const QString &text)
+{
+    foreach (const QContactNickname &nick, contact.details<QContactNickname>()) {
+        if (nick.nickname() == text) {
+            return;
+        }
+    }
+
+    QContactNickname nick;
+    nick.setNickname(text);
+    contact.saveDetail(&nick);
+}
+
 }
 
 QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> &details, int *newCount, int *updatedCount)
@@ -358,9 +371,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
                 importLabels.insert(label, it);
 
                 // Modify this contact to have the label as a nickname
-                QContactNickname nickname;
-                nickname.setNickname(label);
-                contact.saveDetail(&nickname);
+                setNickname(contact, label);
             }
         }
     }
