@@ -718,15 +718,10 @@ QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
     QString group;
     if (!nameProperty.isEmpty()) {
         group = mLocale.indexBucket(nameProperty);
-    } else  if (!cacheItem->displayLabel.isEmpty()) {
+    } else if (!cacheItem->displayLabel.isEmpty()) {
         group = mLocale.indexBucket(cacheItem->displayLabel);
     }
 
-    if (group.isNull() || !allContactNameGroups.contains(group)) {
-        QString displayLabel = generateDisplayLabelFromNonNameDetails(cacheItem->contact);
-        if (!displayLabel.isEmpty())
-            group = mLocale.indexBucket(displayLabel);
-    }
     if (group.isNull() || !allContactNameGroups.contains(group)) {
         group = QString::fromLatin1("#");   // 'other' group
     }
