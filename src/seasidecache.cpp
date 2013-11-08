@@ -1531,6 +1531,12 @@ bool SeasideCache::event(QEvent *event)
         m_contactIdRequest.setFilter(favoriteFilter());
         m_contactIdRequest.setSorting(m_sortOrder);
         m_contactIdRequest.start();
+    } else if (!m_contactsToUpdate.isEmpty()) {
+        applyPendingContactUpdates();
+        if (!m_contactsToUpdate.isEmpty()) {
+            // Send another event to trigger further processing
+            QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
+        }
     } else {
         m_updatesPending = false;
 
@@ -1912,6 +1918,9 @@ void SeasideCache::contactsAvailable()
         fetchHint = m_fetchRequest.fetchHint();
     }
 
+    if (contacts.isEmpty())
+        return;
+
     QSet<DetailTypeId> queryDetailTypes;
     foreach (const DetailTypeId &typeId, detailTypesHint(fetchHint)) {
         queryDetailTypes.insert(typeId);
@@ -1925,60 +1934,101 @@ void SeasideCache::contactsAvailable()
                                                                                                     : FilterOnline));
         appendContacts(contacts, type, partialFetch, queryDetailTypes);
     } else {
-        // An update.
-        QSet<QString> modifiedGroups;
-
-        foreach (QContact contact, contacts) {
-            quint32 iid = internalId(contact);
-
-            QString oldNameGroup;
-            QString oldDisplayLabel;
-
-            CacheItem *item = existingItem(iid);
-            if (!item) {
-                // We haven't seen this contact before
-                item = &(m_people[iid]);
-                item->iid = iid;
-            } else {
-                oldNameGroup = item->nameGroup;
-                oldDisplayLabel = item->displayLabel;
-
-                if (partialFetch) {
-                    // Update our new instance with any details not returned by the current query
-                    updateDetailsFromCache(contact, item, queryDetailTypes);
+        if (m_activeResolve) {
+            // Process these results immediately
+            applyContactUpdates(contacts, partialFetch, queryDetailTypes);
+        } else {
+            // Add these contacts to the list to be progressively appended
+            QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin(), end = m_contactsToUpdate.end();
+            for ( ; it != end; ++it) {
+                if ((*it).first == queryDetailTypes) {
+                    (*it).second.append(contacts);
+                    break;
                 }
             }
-
-            bool roleDataChanged = false;
-
-            // This is a simplification of reality, should we test more changes?
-            if (!partialFetch || queryDetailTypes.contains(detailType<QContactAvatar>())) {
-                roleDataChanged |= (contact.details<QContactAvatar>() != item->contact.details<QContactAvatar>());
-            }
-            if (!partialFetch || queryDetailTypes.contains(detailType<QContactGlobalPresence>())) {
-                roleDataChanged |= (contact.detail<QContactGlobalPresence>() != item->contact.detail<QContactGlobalPresence>());
+            if (it == end) {
+                m_contactsToUpdate.append(qMakePair(queryDetailTypes, contacts));
             }
 
-            roleDataChanged |= updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
+            requestUpdate();
+        }
+    }
+}
 
-            updateCache(item, contact, partialFetch);
-            roleDataChanged |= (item->displayLabel != oldDisplayLabel);
+void SeasideCache::applyPendingContactUpdates()
+{
+    const int updateBatchSize = 3;
 
-            // do this even if !roleDataChanged as name groups are affected by other display label changes
-            if (item->nameGroup != oldNameGroup) {
-                if (!ignoreContactForNameGroups(item->contact)) {
-                    addToContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
-                    removeFromContactNameGroup(item->iid, oldNameGroup, &modifiedGroups);
-                }
-            }
+    QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
 
-            if (roleDataChanged) {
-                instancePtr->contactDataChanged(item->iid);
+    QSet<DetailTypeId> &detailTypes((*it).first);
+    const bool partialFetch = !detailTypes.isEmpty();
+
+    // Update a small number of retrieved contacts
+    QList<QContact> &updatedContacts((*it).second);
+    if (updatedContacts.count() > updateBatchSize) {
+        applyContactUpdates(updatedContacts.mid(0, updateBatchSize), partialFetch, detailTypes);
+        updatedContacts = updatedContacts.mid(updateBatchSize);
+    } else {
+        applyContactUpdates(updatedContacts, partialFetch, detailTypes);
+        m_contactsToUpdate.erase(it);
+    }
+}
+
+void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes)
+{
+    QSet<QString> modifiedGroups;
+
+    foreach (QContact contact, contacts) {
+        quint32 iid = internalId(contact);
+
+        QString oldNameGroup;
+        QString oldDisplayLabel;
+
+        CacheItem *item = existingItem(iid);
+        if (!item) {
+            // We haven't seen this contact before
+            item = &(m_people[iid]);
+            item->iid = iid;
+        } else {
+            oldNameGroup = item->nameGroup;
+            oldDisplayLabel = item->displayLabel;
+
+            if (partialFetch) {
+                // Update our new instance with any details not returned by the current query
+                updateDetailsFromCache(contact, item, queryDetailTypes);
             }
         }
 
-        notifyNameGroupsChanged(modifiedGroups);
+        bool roleDataChanged = false;
+
+        // This is a simplification of reality, should we test more changes?
+        if (!partialFetch || queryDetailTypes.contains(detailType<QContactAvatar>())) {
+            roleDataChanged |= (contact.details<QContactAvatar>() != item->contact.details<QContactAvatar>());
+        }
+        if (!partialFetch || queryDetailTypes.contains(detailType<QContactGlobalPresence>())) {
+            roleDataChanged |= (contact.detail<QContactGlobalPresence>() != item->contact.detail<QContactGlobalPresence>());
+        }
+
+        roleDataChanged |= updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
+
+        updateCache(item, contact, partialFetch);
+        roleDataChanged |= (item->displayLabel != oldDisplayLabel);
+
+        // do this even if !roleDataChanged as name groups are affected by other display label changes
+        if (item->nameGroup != oldNameGroup) {
+            if (!ignoreContactForNameGroups(item->contact)) {
+                addToContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
+                removeFromContactNameGroup(item->iid, oldNameGroup, &modifiedGroups);
+            }
+        }
+
+        if (roleDataChanged) {
+            instancePtr->contactDataChanged(item->iid);
+        }
     }
+
+    notifyNameGroupsChanged(modifiedGroups);
 }
 
 void SeasideCache::addToContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
