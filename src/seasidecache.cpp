@@ -1712,7 +1712,7 @@ void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds)
     }
 }
 
-void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool partialFetch)
+void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool partialFetch, bool initialInsert)
 {
     if (item->contactState < ContactRequested) {
         item->contactState = partialFetch ? ContactPartial : ContactComplete;
@@ -1732,7 +1732,9 @@ void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool pa
     item->displayLabel = generateDisplayLabel(item->contact, m_displayLabelOrder);
     item->nameGroup = determineNameGroup(item);
 
-    reportItemUpdated(item);
+    if (!initialInsert) {
+        reportItemUpdated(item);
+    }
 }
 
 void SeasideCache::reportItemUpdated(CacheItem *item)
@@ -2049,7 +2051,7 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, bool par
 
         roleDataChanged |= updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
 
-        updateCache(item, contact, partialFetch);
+        updateCache(item, contact, partialFetch, false);
         roleDataChanged |= (item->displayLabel != oldDisplayLabel);
 
         // do this even if !roleDataChanged as name groups are affected by other display label changes
@@ -2223,7 +2225,7 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
                 }
 
                 updateContactIndexing(item->contact, contact, iid, queryDetailTypes, item);
-                updateCache(item, contact, partialFetch);
+                updateCache(item, contact, partialFetch, true);
 
                 if (filterType == FilterAll) {
                     addToContactNameGroup(iid, nameGroup(item), &modifiedGroups);
