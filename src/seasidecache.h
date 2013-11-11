@@ -437,6 +437,7 @@ private:
     QHash<ContactIdType, QContact> m_contactsToSave;
     QHash<QString, QSet<quint32> > m_contactNameGroups;
     QList<QContact> m_contactsToCreate;
+    QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToAppend;
     QList<QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToUpdate;
     QList<ContactIdType> m_contactsToRemove;
     QList<ContactIdType> m_changedContacts;

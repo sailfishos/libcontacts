@@ -1488,6 +1488,11 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
+    } else if (!m_contactsToAppend.isEmpty() || !m_contactsToUpdate.isEmpty()) {
+        applyPendingContactUpdates();
+
+        // Send another event to trigger further processing
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
     } else if (!m_resolveAddresses.isEmpty() && !m_fetchRequest.isActive()) {
         const ResolveData &resolve = m_resolveAddresses.first();
 
@@ -1531,12 +1536,6 @@ bool SeasideCache::event(QEvent *event)
         m_contactIdRequest.setFilter(favoriteFilter());
         m_contactIdRequest.setSorting(m_sortOrder);
         m_contactIdRequest.start();
-    } else if (!m_contactsToUpdate.isEmpty()) {
-        applyPendingContactUpdates();
-        if (!m_contactsToUpdate.isEmpty()) {
-            // Send another event to trigger further processing
-            QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
-        }
     } else {
         m_updatesPending = false;
 
@@ -1932,7 +1931,7 @@ void SeasideCache::contactsAvailable()
         FilterType type(m_populateProgress == FetchFavorites ? FilterFavorites
                                                              : (m_populateProgress == FetchMetadata ? FilterAll
                                                                                                     : FilterOnline));
-        appendContacts(contacts, type, partialFetch, queryDetailTypes);
+        m_contactsToAppend.insert(type, qMakePair(queryDetailTypes, contacts));
     } else {
         if (m_activeResolve) {
             // Process these results immediately
@@ -1959,19 +1958,57 @@ void SeasideCache::applyPendingContactUpdates()
 {
     const int updateBatchSize = 3;
 
-    QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
+    if (!m_contactsToAppend.isEmpty()) {
+        // Insert the contacts in the order they're requested
+        QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator end = m_contactsToAppend.end(), it = end;
+        if ((it = m_contactsToAppend.find(FilterFavorites)) != end) {
+        } else if ((it = m_contactsToAppend.find(FilterAll)) != end) {
+        } else {
+            it = m_contactsToAppend.find(FilterOnline);
+        }
+        Q_ASSERT(it != end);
 
-    QSet<DetailTypeId> &detailTypes((*it).first);
-    const bool partialFetch = !detailTypes.isEmpty();
+        FilterType type = it.key();
+        QSet<DetailTypeId> &detailTypes((*it).first);
+        const bool partialFetch = !detailTypes.isEmpty();
 
-    // Update a small number of retrieved contacts
-    QList<QContact> &updatedContacts((*it).second);
-    if (updatedContacts.count() > updateBatchSize) {
-        applyContactUpdates(updatedContacts.mid(0, updateBatchSize), partialFetch, detailTypes);
-        updatedContacts = updatedContacts.mid(updateBatchSize);
+        // Append a small number of retrieved contacts
+        QList<QContact> &appendedContacts((*it).second);
+        if (appendedContacts.count() > updateBatchSize) {
+            appendContacts(appendedContacts.mid(0, updateBatchSize), type, partialFetch, detailTypes);
+            appendedContacts = appendedContacts.mid(updateBatchSize);
+        } else {
+            appendContacts(appendedContacts, type, partialFetch, detailTypes);
+            m_contactsToAppend.erase(it);
+
+            // This list has been processed - have we finished populating the group?
+            if (type == FilterFavorites && (m_populateProgress != FetchFavorites)) {
+                makePopulated(FilterFavorites);
+                qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
+            } else if (type == FilterAll && (m_populateProgress != FetchMetadata)) {
+                makePopulated(FilterNone);
+                makePopulated(FilterAll);
+                qDebug() << "All queried in" << m_timer.elapsed() << "ms";
+            } else if (type == FilterOnline && (m_populateProgress != FetchOnline)) {
+                makePopulated(FilterOnline);
+                qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
+            }
+        }
     } else {
-        applyContactUpdates(updatedContacts, partialFetch, detailTypes);
-        m_contactsToUpdate.erase(it);
+        QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
+
+        QSet<DetailTypeId> &detailTypes((*it).first);
+        const bool partialFetch = !detailTypes.isEmpty();
+
+        // Update a small number of retrieved contacts
+        QList<QContact> &updatedContacts((*it).second);
+        if (updatedContacts.count() > updateBatchSize) {
+            applyContactUpdates(updatedContacts.mid(0, updateBatchSize), partialFetch, detailTypes);
+            updatedContacts = updatedContacts.mid(updateBatchSize);
+        } else {
+            applyContactUpdates(updatedContacts, partialFetch, detailTypes);
+            m_contactsToUpdate.erase(it);
+        }
     }
 }
 
@@ -2350,9 +2387,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchFavorites;
             activityCompleted = false;
         } else if (m_populateProgress == FetchFavorites) {
-            makePopulated(FilterFavorites);
-            qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
-
             // Next, query for all contacts (except favorites)
             // Request the metadata of all contacts (only data from the primary table)
             m_fetchRequest.setFilter(allFilter());
@@ -2365,10 +2399,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchMetadata;
             activityCompleted = false;
         } else if (m_populateProgress == FetchMetadata) {
-            makePopulated(FilterNone);
-            makePopulated(FilterAll);
-            qDebug() << "All queried in" << m_timer.elapsed() << "ms";
-
             // Now query for online contacts
             m_fetchRequest.setFilter(onlineFilter());
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
@@ -2379,9 +2409,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchOnline;
             activityCompleted = false;
         } else if (m_populateProgress == FetchOnline) {
-            makePopulated(FilterOnline);
-            qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
-
             m_populateProgress = Populated;
         } else if (m_populateProgress == RefetchFavorites) {
             // Re-fetch the non-favorites
