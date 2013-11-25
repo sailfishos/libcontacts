@@ -33,8 +33,11 @@
 
 #include "synchronizelists.h"
 
-#include "qtcontacts-extensions_impl.h"
-#include "qcontactstatusflags_impl.h"
+#include <qtcontacts-extensions_impl.h>
+#include <qcontactstatusflags_impl.h>
+#include <contactmanagerengine.h>
+
+#include <private/qcontactmanager_p.h>
 
 #include <QCoreApplication>
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
@@ -98,7 +101,7 @@ QString managerName()
 {
 #ifdef USING_QTPIM
     // Temporary override until qtpim supports QTCONTACTS_MANAGER_OVERRIDE
-    return QStringLiteral("org.nemomobile.contacts.sqlite");
+    return QString::fromLatin1("org.nemomobile.contacts.sqlite");
 #endif
     QByteArray environmentManager = qgetenv("NEMO_CONTACT_MANAGER");
     return !environmentManager.isEmpty()
@@ -106,7 +109,17 @@ QString managerName()
             : QString();
 }
 
-Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName()))
+QMap<QString, QString> managerParameters()
+{
+    QMap<QString, QString> rv;
+#ifdef USING_QTPIM
+    // Report presence changes independently from other contact changes
+    rv.insert(QString::fromLatin1("mergePresenceChanges"), QString::fromLatin1("false"));
+#endif
+    return rv;
+}
+
+Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName(), managerParameters()))
 
 typedef QList<DetailTypeId> DetailList;
 
@@ -514,12 +527,19 @@ SeasideCache::SeasideCache()
 
     QContactManager *mgr(manager());
 
+    // The contactsPresenceChanged signal is not exported by QContactManager, so we
+    // need to find it from the manager's engine object
+    typedef QtContactsSqliteExtensions::ContactManagerEngine EngineType;
+    EngineType *cme = dynamic_cast<EngineType *>(QContactManagerData::managerData(mgr)->m_engine);
+
 #ifdef USING_QTPIM
     connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactId>)),
             this, SLOT(contactsChanged(QList<QContactId>)));
+    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactId>)),
+            this, SLOT(contactsPresenceChanged(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactId>)),
             this, SLOT(contactsRemoved(QList<QContactId>)));
 #else
@@ -528,6 +548,8 @@ SeasideCache::SeasideCache()
             this, SLOT(contactsAdded(QList<QContactLocalId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactLocalId>)),
             this, SLOT(contactsChanged(QList<QContactLocalId>)));
+    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactLocalId>)),
+            this, SLOT(contactsPresenceChanged(QList<QContactLocalId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactLocalId>)),
             this, SLOT(contactsRemoved(QList<QContactLocalId>)));
 #endif
@@ -1602,6 +1624,12 @@ void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
         }
         updateContacts(presentIds);
     }
+}
+
+void SeasideCache::contactsPresenceChanged(const QList<ContactIdType> &ids)
+{
+    // For now, treat presence change equivalently to other changes
+    contactsChanged(ids);
 }
 
 void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)

@@ -363,10 +363,12 @@ private slots:
 #ifdef USING_QTPIM
     void contactsAdded(const QList<QContactId> &contactIds);
     void contactsChanged(const QList<QContactId> &contactIds);
+    void contactsPresenceChanged(const QList<QContactId> &contactIds);
     void contactsRemoved(const QList<QContactId> &contactIds);
 #else
     void contactsAdded(const QList<QContactLocalId> &contactIds);
     void contactsChanged(const QList<QContactLocalId> &contactIds);
+    void contactsPresenceChanged(const QList<QContactLocalId> &contactIds);
     void contactsRemoved(const QList<QContactLocalId> &contactIds);
 #endif
     void displayLabelOrderChanged();

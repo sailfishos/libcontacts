@@ -36,6 +36,19 @@ equals(QT_MAJOR_VERSION, 5) {
 
 DEFINES += CONTACTCACHE_BUILD
 
+# We need access to QtContacts private headers
+QT += contacts-private
+
+# We need the moc output for ContactManagerEngine from sqlite-extensions
+equals(QT_MAJOR_VERSION, 4) {
+    extensionsIncludePath = $$system(pkg-config --cflags-only-I qtcontacts-sqlite-extensions)
+}
+equals(QT_MAJOR_VERSION, 5) {
+    extensionsIncludePath = $$system(pkg-config --cflags-only-I qtcontacts-sqlite-qt5-extensions)
+}
+VPATH += $$replace(extensionsIncludePath, -I, )
+HEADERS += contactmanagerengine.h
+
 SOURCES += \
     $$PWD/seasidecache.cpp \
     $$PWD/seasideimport.cpp \
