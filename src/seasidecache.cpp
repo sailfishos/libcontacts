@@ -182,6 +182,16 @@ QContactFetchHint basicFetchHint()
     return fetchHint;
 }
 
+QContactFetchHint presenceFetchHint()
+{
+    QContactFetchHint fetchHint(basicFetchHint());
+
+    setDetailTypesHint(fetchHint, DetailList() << detailType<QContactPresence>()
+                                               << detailType<QContactGlobalPresence>());
+
+    return fetchHint;
+}
+
 QContactFetchHint metadataFetchHint(quint32 fetchTypes = 0)
 {
     QContactFetchHint fetchHint(basicFetchHint());
@@ -1510,6 +1520,28 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
+    } else if (!m_presenceChangedContacts.isEmpty() && !m_fetchRequest.isActive()) {
+        const int maxRequestIds = 200;
+
+#ifdef USING_QTPIM
+        QContactIdFilter filter;
+#else
+        QContactLocalIdFilter filter;
+#endif
+        if (m_presenceChangedContacts.count() > maxRequestIds) {
+            filter.setIds(m_presenceChangedContacts.mid(0, maxRequestIds));
+            m_presenceChangedContacts = m_presenceChangedContacts.mid(maxRequestIds);
+        } else {
+            filter.setIds(m_presenceChangedContacts);
+            m_presenceChangedContacts.clear();
+        }
+
+        m_fetchRequest.setFilter(filter & aggregateFilter());
+        m_fetchRequest.setFetchHint(presenceFetchHint());
+        m_fetchRequest.setSorting(m_sortOrder);
+        m_fetchRequest.start();
+
+        m_fetchProcessedCount = 0;
     } else if (!m_resolveAddresses.isEmpty() && !m_fetchRequest.isActive()) {
         const ResolveData &resolve = m_resolveAddresses.first();
 
@@ -1606,14 +1638,14 @@ void SeasideCache::timerEvent(QTimerEvent *event)
 void SeasideCache::contactsAdded(const QList<ContactIdType> &ids)
 {
     if (m_keepPopulated) {
-        updateContacts(ids);
+        updateContacts(ids, &m_changedContacts);
     }
 }
 
 void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
 {
     if (m_keepPopulated) {
-        updateContacts(ids);
+        updateContacts(ids, &m_changedContacts);
     } else {
         // Update these contacts if they're already in the cache
         QList<ContactIdType> presentIds;
@@ -1622,14 +1654,24 @@ void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
                 presentIds.append(id);
             }
         }
-        updateContacts(presentIds);
+        updateContacts(presentIds, &m_changedContacts);
     }
 }
 
 void SeasideCache::contactsPresenceChanged(const QList<ContactIdType> &ids)
 {
-    // For now, treat presence change equivalently to other changes
-    contactsChanged(ids);
+    if (m_keepPopulated) {
+        updateContacts(ids, &m_presenceChangedContacts);
+    } else {
+        // Update these contacts if they're already in the cache
+        QList<ContactIdType> presentIds;
+        foreach (const ContactIdType &id, ids) {
+            if (existingItem(id)) {
+                presentIds.append(id);
+            }
+        }
+        updateContacts(presentIds, &m_presenceChangedContacts);
+    }
 }
 
 void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)
@@ -1682,7 +1724,7 @@ void SeasideCache::updateContacts()
             contactIds.append(it->apiId());
     }
 
-    updateContacts(contactIds);
+    updateContacts(contactIds, &m_changedContacts);
 }
 
 void SeasideCache::fetchContacts()
@@ -1708,7 +1750,7 @@ void SeasideCache::fetchContacts()
     }
 }
 
-void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds)
+void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds, QList<ContactIdType> *updateList)
 {
     // Wait for new changes to be reported
     static const int PostponementIntervalMs = 500;
@@ -1718,7 +1760,7 @@ void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds)
 
     if (!contactIds.isEmpty()) {
         m_contactsUpdated = true;
-        m_changedContacts.append(contactIds);
+        updateList->append(contactIds);
 
         if (m_fetchPostponed.isValid()) {
             // We are waiting to accumulate further changes
@@ -1939,6 +1981,8 @@ void SeasideCache::contactsAvailable()
         m_fetchProcessedCount += contacts.count();
         fetchHint = m_fetchRequest.fetchHint();
     }
+    if (contacts.isEmpty())
+        return;
 
     QSet<DetailTypeId> queryDetailTypes;
     foreach (const DetailTypeId &typeId, detailTypesHint(fetchHint)) {
