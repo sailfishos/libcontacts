@@ -2477,7 +2477,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             // Re-fetch the non-favorites
             m_fetchRequest.setFilter(nonfavoriteFilter());
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
-            m_fetchRequest.setSorting(m_sortOrder);
             m_fetchRequest.start();
             m_fetchProcessedCount = 0;
 
