@@ -1516,7 +1516,6 @@ bool SeasideCache::event(QEvent *event)
         // we only want to retrieve aggregate contacts that have changed
         m_fetchRequest.setFilter(filter & aggregateFilter());
         m_fetchRequest.setFetchHint(basicFetchHint());
-        m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
@@ -1538,7 +1537,6 @@ bool SeasideCache::event(QEvent *event)
 
         m_fetchRequest.setFilter(filter & aggregateFilter());
         m_fetchRequest.setFetchHint(presenceFetchHint());
-        m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
@@ -1574,7 +1572,6 @@ bool SeasideCache::event(QEvent *event)
         // as the favorites store, so we don't update any favorite with a smaller data subset
         m_activeResolve = &resolve;
         m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes));
-        m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
