@@ -99,23 +99,14 @@ QStringList getAllContactNameGroups()
 
 QString managerName()
 {
-#ifdef USING_QTPIM
-    // Temporary override until qtpim supports QTCONTACTS_MANAGER_OVERRIDE
     return QString::fromLatin1("org.nemomobile.contacts.sqlite");
-#endif
-    QByteArray environmentManager = qgetenv("NEMO_CONTACT_MANAGER");
-    return !environmentManager.isEmpty()
-            ? QString::fromLatin1(environmentManager, environmentManager.length())
-            : QString();
 }
 
 QMap<QString, QString> managerParameters()
 {
     QMap<QString, QString> rv;
-#ifdef USING_QTPIM
     // Report presence changes independently from other contact changes
     rv.insert(QString::fromLatin1("mergePresenceChanges"), QString::fromLatin1("false"));
-#endif
     return rv;
 }
 
