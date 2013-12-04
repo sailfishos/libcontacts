@@ -30,36 +30,40 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
  */
 
-#include "seasidephotohandler.h"
+#include "seasidepropertyhandler.h"
 
 #ifndef QT_VERSION_5
 #include <QDesktopServices>
 #include <QContactThumbnail>
 #endif
 #include <QContactAvatar>
+#include <QContactOnlineAccount>
+#include <QContactPresence>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QImage>
 
-SeasidePhotoHandler::SeasidePhotoHandler()
+#include <qtcontacts-extensions.h>
+
+SeasidePropertyHandler::SeasidePropertyHandler()
 {
 }
 
-SeasidePhotoHandler::~SeasidePhotoHandler()
+SeasidePropertyHandler::~SeasidePropertyHandler()
 {
 }
 
-void SeasidePhotoHandler::documentProcessed(const QVersitDocument &, QContact *)
+void SeasidePropertyHandler::documentProcessed(const QVersitDocument &, QContact *)
 {
     // do nothing, have no state to clean.
 }
 
-void SeasidePhotoHandler::propertyProcessed(const QVersitDocument &, const QVersitProperty &property, const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+namespace {
+
+void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
 {
     // if the property is a PHOTO property, store the data to disk
     // and then create an avatar detail which points to it.
-    if (property.name().toLower() != QLatin1String("photo"))
-        return;
 
 #ifndef QT_VERSION_5
     // The Qt4 / QtMobility version has QContactThumbnail support.
@@ -163,5 +167,52 @@ void SeasidePhotoHandler::propertyProcessed(const QVersitDocument &, const QVers
 
     // we have successfully processed this PHOTO property.
     *alreadyProcessed = true;
+}
+
+void processOnlineAccount(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+{
+    // Create an online account instance for demo purposes; it will not be connected
+    // to a registered telepathy account, so it won't actually be able to converse
+
+    // Try to interpret the data as a stringlist
+    const QString detail(property.variantValue().toString());
+
+    // The format is: URI/path/display-name/icon-path/service-provider/service-provider-display-name
+    const QStringList details(detail.split(QLatin1Char(';'), QString::KeepEmptyParts));
+    if (details.count() == 6) {
+        QContactOnlineAccount qcoa;
+
+        qcoa.setValue(QContactOnlineAccount::FieldAccountUri, details.at(0));
+        qcoa.setValue(QContactOnlineAccount__FieldAccountPath, details.at(1));
+        qcoa.setValue(QContactOnlineAccount__FieldAccountDisplayName, details.at(2));
+        qcoa.setValue(QContactOnlineAccount__FieldAccountIconPath, details.at(3));
+        qcoa.setValue(QContactOnlineAccount::FieldServiceProvider, details.at(4));
+        qcoa.setValue(QContactOnlineAccount__FieldServiceProviderDisplayName, details.at(5));
+        qcoa.setDetailUri(QString::fromLatin1("%1:%2").arg(details.at(1)).arg(details.at(0)));
+
+        updatedDetails->append(qcoa);
+
+        // Since it is a demo account, give it a random presence state
+        const int state = (qrand() % 4);
+        QContactPresence presence;
+        presence.setPresenceState(state == 3 ? QContactPresence::PresenceBusy : (state == 2 ? QContactPresence::PresenceAway : QContactPresence::PresenceAvailable));
+        presence.setLinkedDetailUris(QStringList() << qcoa.detailUri());
+        updatedDetails->append(presence);
+
+        *alreadyProcessed = true;
+    } else {
+        qWarning() << "Invalid online account details:" << details;
+    }
+}
+
+}
+
+void SeasidePropertyHandler::propertyProcessed(const QVersitDocument &, const QVersitProperty &property, const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+{
+    if (property.name().toLower() == QLatin1String("photo")) {
+        processPhoto(property, alreadyProcessed, updatedDetails);
+    } else if (property.name().toLower() == QLatin1String("x-nemomobile-onlineaccount-demo")) {
+        processOnlineAccount(property, alreadyProcessed, updatedDetails);
+    }
 }
 

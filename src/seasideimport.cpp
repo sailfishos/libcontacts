@@ -32,7 +32,7 @@
 #include "seasideimport.h"
 
 #include "seasidecache.h"
-#include "seasidephotohandler.h"
+#include "seasidepropertyhandler.h"
 
 #include <QContactDetailFilter>
 #include <QContactFetchHint>
@@ -312,9 +312,9 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         *updatedCount = 0;
 
     // Read the contacts from the import details
-    SeasidePhotoHandler photoHandler;
+    SeasidePropertyHandler propertyHandler;
     QVersitContactImporter importer;
-    importer.setPropertyHandler(&photoHandler);
+    importer.setPropertyHandler(&propertyHandler);
     importer.importDocuments(details);
 
     QList<QContact> importedContacts(importer.contacts());

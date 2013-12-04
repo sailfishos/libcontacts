@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
  */
 
-#ifndef PHOTOHANDLER_H
-#define PHOTOHANDLER_H
+#ifndef PROPERTYHANDLER_H
+#define PROPERTYHANDLER_H
 
 #include "contactcacheexport.h"
 
@@ -58,18 +58,21 @@ QTM_USE_NAMESPACE
 #endif
 
 /*
-    SeasidePhotoHandler
+    SeasidePropertyHandler
 
     Some backends don't support saving PHOTO data directly.
     Instead, the PHOTO data needs to be extracted, saved to
     a file, and then the path to the file needs to be saved
     to the backend as a contact avatar url detail.
+
+    Also support the X-NEMOMOBILE-ONLINEACCOUNT-DEMO property
+    for loading demo online account data.
 */
-class CONTACTCACHE_EXPORT SeasidePhotoHandler : public QVersitContactImporterPropertyHandlerV2
+class CONTACTCACHE_EXPORT SeasidePropertyHandler : public QVersitContactImporterPropertyHandlerV2
 {
 public:
-    SeasidePhotoHandler();
-    ~SeasidePhotoHandler();
+    SeasidePropertyHandler();
+    ~SeasidePropertyHandler();
 
     // QVersitContactImporterPropertyHandlerV2
     void documentProcessed(const QVersitDocument &, QContact *);
@@ -77,4 +80,4 @@ public:
                            const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails);
 };
 
-#endif // PHOTOHANDLER_H
+#endif // PROPERTYHANDLER_H
