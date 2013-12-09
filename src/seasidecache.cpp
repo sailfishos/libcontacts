@@ -45,6 +45,7 @@
 #else
 #include <QDesktopServices>
 #endif
+#include <QDBusConnection>
 #include <QDir>
 #include <QEvent>
 #include <QFile>
@@ -71,6 +72,9 @@
 #include <QtDebug>
 
 #include <mlocale.h>
+
+#include <mce/dbus-names.h>
+#include <mce/mode-names.h>
 
 #ifdef USING_QTPIM
 QTVERSIT_USE_NAMESPACE
@@ -501,6 +505,7 @@ SeasideCache::SeasideCache()
     , m_updatesPending(false)
     , m_refreshRequired(false)
     , m_contactsUpdated(false)
+    , m_displayOff(false)
     , m_activeResolve(0)
 {
     Q_ASSERT(!instancePtr);
@@ -525,6 +530,11 @@ SeasideCache::SeasideCache()
     if (groupPropertyConf.isValid())
         m_groupProperty = groupPropertyConf.toString();
 #endif
+
+    if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
+                                              MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
+        qWarning() << "Unable to connect to MCE displayStatusChanged signal";
+    }
 
     QContactManager *mgr(manager());
 
@@ -1486,7 +1496,7 @@ bool SeasideCache::event(QEvent *event)
         m_fetchProcessedCount = 0;
         m_fetchTypesChanged = false;
         m_populateProgress = RefetchFavorites;
-    } else if (!m_changedContacts.isEmpty() && !m_fetchRequest.isActive()) {
+    } else if (!m_changedContacts.isEmpty() && !m_fetchRequest.isActive() && !m_displayOff) {
         // If we request too many IDs we will exceed the SQLite bound variables limit
         // The actual limit is over 800, but we should reduce further to increase interactivity
         const int maxRequestIds = 200;
@@ -1511,7 +1521,7 @@ bool SeasideCache::event(QEvent *event)
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
-    } else if (!m_presenceChangedContacts.isEmpty() && !m_fetchRequest.isActive()) {
+    } else if (!m_presenceChangedContacts.isEmpty() && !m_fetchRequest.isActive() && !m_displayOff) {
         const int maxRequestIds = 200;
 
 #ifdef USING_QTPIM
@@ -1619,7 +1629,10 @@ bool SeasideCache::event(QEvent *event)
 void SeasideCache::timerEvent(QTimerEvent *event)
 {
     if (event->timerId() == m_fetchTimer.timerId()) {
-        fetchContacts();
+        // If the display is off, defer these fetches until they can be seen
+        if (!m_displayOff) {
+            fetchContacts();
+        }
     }
 
     if (event->timerId() == m_expiryTimer.timerId()) {
@@ -1756,17 +1769,20 @@ void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds, QList<
         m_contactsUpdated = true;
         updateList->append(contactIds);
 
-        if (m_fetchPostponed.isValid()) {
-            // We are waiting to accumulate further changes
-            int remainder = MaxPostponementMs - m_fetchPostponed.elapsed();
-            if (remainder > 0) {
-                // We can postpone further
-                m_fetchTimer.start(std::min(remainder, PostponementIntervalMs), this);
+        // If the display is off, defer fetching these changes
+        if (!m_displayOff) {
+            if (m_fetchPostponed.isValid()) {
+                // We are waiting to accumulate further changes
+                int remainder = MaxPostponementMs - m_fetchPostponed.elapsed();
+                if (remainder > 0) {
+                    // We can postpone further
+                    m_fetchTimer.start(std::min(remainder, PostponementIntervalMs), this);
+                }
+            } else {
+                // Wait for further changes before we query for the ones we have now
+                m_fetchPostponed.restart();
+                m_fetchTimer.start(PostponementIntervalMs, this);
             }
-        } else {
-            // Wait for further changes before we query for the ones we have now
-            m_fetchPostponed.restart();
-            m_fetchTimer.start(PostponementIntervalMs, this);
         }
     }
 }
@@ -2691,6 +2707,19 @@ void SeasideCache::groupPropertyChanged()
         }
     }
 #endif
+}
+
+void SeasideCache::displayStatusChanged(const QString &status)
+{
+    const bool off = (status == QLatin1String(MCE_DISPLAY_OFF_STRING));
+    if (m_displayOff != off) {
+        m_displayOff = off;
+
+        if (!m_displayOff) {
+            // The display has been enabled; check for pending fetches
+            requestUpdate();
+        }
+    }
 }
 
 int SeasideCache::importContacts(const QString &path)

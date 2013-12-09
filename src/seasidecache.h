@@ -374,6 +374,7 @@ private slots:
     void displayLabelOrderChanged();
     void sortPropertyChanged();
     void groupPropertyChanged();
+    void displayStatusChanged(const QString &);
 
 private:
     enum PopulateProgress {
@@ -492,6 +493,7 @@ private:
     bool m_updatesPending;
     bool m_refreshRequired;
     bool m_contactsUpdated;
+    bool m_displayOff;
     QSet<ContactIdType> m_constituentIds;
     QSet<ContactIdType> m_candidateIds;
 
