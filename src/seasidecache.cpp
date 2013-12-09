@@ -1958,8 +1958,6 @@ void SeasideCache::contactsAvailable()
 
 void SeasideCache::applyPendingContactUpdates()
 {
-    const int updateBatchSize = 3;
-
     if (!m_contactsToAppend.isEmpty()) {
         // Insert the contacts in the order they're requested
         QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator end = m_contactsToAppend.end(), it = end;
@@ -1974,13 +1972,10 @@ void SeasideCache::applyPendingContactUpdates()
         QSet<DetailTypeId> &detailTypes((*it).first);
         const bool partialFetch = !detailTypes.isEmpty();
 
-        // Append a small number of retrieved contacts
         QList<QContact> &appendedContacts((*it).second);
-        if (appendedContacts.count() > updateBatchSize) {
-            appendContacts(appendedContacts.mid(0, updateBatchSize), type, partialFetch, detailTypes);
-            appendedContacts = appendedContacts.mid(updateBatchSize);
-        } else {
-            appendContacts(appendedContacts, type, partialFetch, detailTypes);
+        appendContacts(QList<QContact>() << appendedContacts.takeFirst(), type, partialFetch, detailTypes);
+
+        if (appendedContacts.isEmpty()) {
             m_contactsToAppend.erase(it);
 
             // This list has been processed - have we finished populating the group?
@@ -2002,13 +1997,12 @@ void SeasideCache::applyPendingContactUpdates()
         QSet<DetailTypeId> &detailTypes((*it).first);
         const bool partialFetch = !detailTypes.isEmpty();
 
-        // Update a small number of retrieved contacts
+        // Update a single contact at a time; the update can cause numerous QML bindings
+        // to be re-evaluated, so even a single contact update might be a slow operation
         QList<QContact> &updatedContacts((*it).second);
-        if (updatedContacts.count() > updateBatchSize) {
-            applyContactUpdates(updatedContacts.mid(0, updateBatchSize), partialFetch, detailTypes);
-            updatedContacts = updatedContacts.mid(updateBatchSize);
-        } else {
-            applyContactUpdates(updatedContacts, partialFetch, detailTypes);
+        applyContactUpdates(QList<QContact>() << updatedContacts.takeFirst(), partialFetch, detailTypes);
+
+        if (updatedContacts.isEmpty()) {
             m_contactsToUpdate.erase(it);
         }
     }
