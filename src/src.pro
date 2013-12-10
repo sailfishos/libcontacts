@@ -23,6 +23,7 @@ equals(QT_MAJOR_VERSION, 4) {
     } else {
         warning("mlite not available. Some functionality may not work as expected.")
     }
+    PKGCONFIG += mce
 }
 equals(QT_MAJOR_VERSION, 5) {
     packagesExist(mlite5) {
@@ -31,7 +32,7 @@ equals(QT_MAJOR_VERSION, 5) {
     } else {
         warning("mlite not available. Some functionality may not work as expected.")
     }
-    PKGCONFIG += mlocale5
+    PKGCONFIG += mlocale5 mce
 }
 
 DEFINES += CONTACTCACHE_BUILD
