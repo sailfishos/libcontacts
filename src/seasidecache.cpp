@@ -1089,12 +1089,6 @@ QString SeasideCache::generateDisplayLabel(const QContact &contact, DisplayLabel
         return displayLabel;
     }
 
-    // If no label was determined from any of the available detail, fallback to the backend's label
-    displayLabel = contact.detail<QContactDisplayLabel>().label();
-    if (!displayLabel.isEmpty()) {
-        return displayLabel;
-    }
-
     return "(Unnamed)"; // TODO: localisation
 }
 
@@ -1117,6 +1111,13 @@ QString SeasideCache::generateDisplayLabelFromNonNameDetails(const QContact &con
         if (!presence.nickname().isEmpty()) {
             return presence.nickname();
         }
+    }
+
+    // If none of the detail fields provides a label, fallback to the backend's label string, in
+    // preference to using any of the addressing details directly
+    const QString displayLabel = contact.detail<QContactDisplayLabel>().label();
+    if (!displayLabel.isEmpty()) {
+        return displayLabel;
     }
 
     foreach (const QContactOnlineAccount& account, contact.details<QContactOnlineAccount>()) {
