@@ -395,10 +395,12 @@ private:
     void appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
     void fetchContacts();
     void updateContacts(const QList<ContactIdType> &contactIds);
+    void applyPendingContactUpdates();
+    void applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
 
     void resolveUnknownAddresses(const QString &first, const QString &second, CacheItem *item);
     bool updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<DetailTypeId> &queryDetailTypes, CacheItem *item);
-    void updateCache(CacheItem *item, const QContact &contact, bool partialFetch);
+    void updateCache(CacheItem *item, const QContact &contact, bool partialFetch, bool initialInsert);
     void reportItemUpdated(CacheItem *item);
 
     void removeRange(FilterType filter, int index, int count);
@@ -435,6 +437,8 @@ private:
     QHash<ContactIdType, QContact> m_contactsToSave;
     QHash<QString, QSet<quint32> > m_contactNameGroups;
     QList<QContact> m_contactsToCreate;
+    QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToAppend;
+    QList<QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToUpdate;
     QList<ContactIdType> m_contactsToRemove;
     QList<ContactIdType> m_changedContacts;
     QSet<ContactIdType> m_aggregatedContacts;
