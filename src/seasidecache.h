@@ -117,6 +117,11 @@ public:
         ContactComplete
     };
 
+    enum {
+        // Must be after the highest bit used in QContactStatusFlags::Flag
+        HasValidOnlineAccount = (QContactStatusFlags::IsOnline << 1)
+    };
+
     struct ItemData
     {
         virtual ~ItemData() {}

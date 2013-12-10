@@ -1936,6 +1936,9 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
                 oldAddresses.insert(address);
         }
 
+        // Keep track of whether this contact has any valid IM accounts
+        bool hasValid = false;
+
         foreach (const QContactOnlineAccount &account, contact.details<QContactOnlineAccount>()) {
             const StringPair address(addressPair(account));
             if (!validAddressPair(address))
@@ -1947,6 +1950,13 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
             }
 
             m_onlineAccountIds[address] = iid;
+            hasValid = true;
+        }
+
+        if (hasValid) {
+            item->statusFlags |= HasValidOnlineAccount;
+        } else {
+            item->statusFlags &= ~HasValidOnlineAccount;
         }
 
         if (!oldAddresses.isEmpty()) {
