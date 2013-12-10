@@ -363,10 +363,12 @@ private slots:
 #ifdef USING_QTPIM
     void contactsAdded(const QList<QContactId> &contactIds);
     void contactsChanged(const QList<QContactId> &contactIds);
+    void contactsPresenceChanged(const QList<QContactId> &contactIds);
     void contactsRemoved(const QList<QContactId> &contactIds);
 #else
     void contactsAdded(const QList<QContactLocalId> &contactIds);
     void contactsChanged(const QList<QContactLocalId> &contactIds);
+    void contactsPresenceChanged(const QList<QContactLocalId> &contactIds);
     void contactsRemoved(const QList<QContactLocalId> &contactIds);
 #endif
     void displayLabelOrderChanged();
@@ -394,7 +396,7 @@ private:
     void requestUpdate();
     void appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
     void fetchContacts();
-    void updateContacts(const QList<ContactIdType> &contactIds);
+    void updateContacts(const QList<ContactIdType> &contactIds, QList<ContactIdType> *updateList);
     void applyPendingContactUpdates();
     void applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
 
@@ -441,6 +443,7 @@ private:
     QList<QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToUpdate;
     QList<ContactIdType> m_contactsToRemove;
     QList<ContactIdType> m_changedContacts;
+    QList<ContactIdType> m_presenceChangedContacts;
     QSet<ContactIdType> m_aggregatedContacts;
     QList<QContactId> m_contactsToFetchConstituents;
     QList<QContactId> m_contactsToFetchCandidates;

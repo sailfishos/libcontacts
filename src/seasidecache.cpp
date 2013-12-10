@@ -33,8 +33,11 @@
 
 #include "synchronizelists.h"
 
-#include "qtcontacts-extensions_impl.h"
-#include "qcontactstatusflags_impl.h"
+#include <qtcontacts-extensions_impl.h>
+#include <qcontactstatusflags_impl.h>
+#include <contactmanagerengine.h>
+
+#include <private/qcontactmanager_p.h>
 
 #include <QCoreApplication>
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
@@ -96,17 +99,18 @@ QStringList getAllContactNameGroups()
 
 QString managerName()
 {
-#ifdef USING_QTPIM
-    // Temporary override until qtpim supports QTCONTACTS_MANAGER_OVERRIDE
-    return QStringLiteral("org.nemomobile.contacts.sqlite");
-#endif
-    QByteArray environmentManager = qgetenv("NEMO_CONTACT_MANAGER");
-    return !environmentManager.isEmpty()
-            ? QString::fromLatin1(environmentManager, environmentManager.length())
-            : QString();
+    return QString::fromLatin1("org.nemomobile.contacts.sqlite");
 }
 
-Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName()))
+QMap<QString, QString> managerParameters()
+{
+    QMap<QString, QString> rv;
+    // Report presence changes independently from other contact changes
+    rv.insert(QString::fromLatin1("mergePresenceChanges"), QString::fromLatin1("false"));
+    return rv;
+}
+
+Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName(), managerParameters()))
 
 typedef QList<DetailTypeId> DetailList;
 
@@ -165,6 +169,16 @@ QContactFetchHint basicFetchHint()
     fetchHint.setOptimizationHints(QContactFetchHint::NoRelationships |
                                    QContactFetchHint::NoActionPreferences |
                                    QContactFetchHint::NoBinaryBlobs);
+
+    return fetchHint;
+}
+
+QContactFetchHint presenceFetchHint()
+{
+    QContactFetchHint fetchHint(basicFetchHint());
+
+    setDetailTypesHint(fetchHint, DetailList() << detailType<QContactPresence>()
+                                               << detailType<QContactGlobalPresence>());
 
     return fetchHint;
 }
@@ -514,12 +528,19 @@ SeasideCache::SeasideCache()
 
     QContactManager *mgr(manager());
 
+    // The contactsPresenceChanged signal is not exported by QContactManager, so we
+    // need to find it from the manager's engine object
+    typedef QtContactsSqliteExtensions::ContactManagerEngine EngineType;
+    EngineType *cme = dynamic_cast<EngineType *>(QContactManagerData::managerData(mgr)->m_engine);
+
 #ifdef USING_QTPIM
     connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactId>)),
             this, SLOT(contactsChanged(QList<QContactId>)));
+    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactId>)),
+            this, SLOT(contactsPresenceChanged(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactId>)),
             this, SLOT(contactsRemoved(QList<QContactId>)));
 #else
@@ -528,6 +549,8 @@ SeasideCache::SeasideCache()
             this, SLOT(contactsAdded(QList<QContactLocalId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactLocalId>)),
             this, SLOT(contactsChanged(QList<QContactLocalId>)));
+    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactLocalId>)),
+            this, SLOT(contactsPresenceChanged(QList<QContactLocalId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactLocalId>)),
             this, SLOT(contactsRemoved(QList<QContactLocalId>)));
 #endif
@@ -1485,7 +1508,27 @@ bool SeasideCache::event(QEvent *event)
         // we only want to retrieve aggregate contacts that have changed
         m_fetchRequest.setFilter(filter & aggregateFilter());
         m_fetchRequest.setFetchHint(basicFetchHint());
-        m_fetchRequest.setSorting(m_sortOrder);
+        m_fetchRequest.start();
+
+        m_fetchProcessedCount = 0;
+    } else if (!m_presenceChangedContacts.isEmpty() && !m_fetchRequest.isActive()) {
+        const int maxRequestIds = 200;
+
+#ifdef USING_QTPIM
+        QContactIdFilter filter;
+#else
+        QContactLocalIdFilter filter;
+#endif
+        if (m_presenceChangedContacts.count() > maxRequestIds) {
+            filter.setIds(m_presenceChangedContacts.mid(0, maxRequestIds));
+            m_presenceChangedContacts = m_presenceChangedContacts.mid(maxRequestIds);
+        } else {
+            filter.setIds(m_presenceChangedContacts);
+            m_presenceChangedContacts.clear();
+        }
+
+        m_fetchRequest.setFilter(filter & aggregateFilter());
+        m_fetchRequest.setFetchHint(presenceFetchHint());
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
@@ -1526,7 +1569,6 @@ bool SeasideCache::event(QEvent *event)
         // as the favorites store, so we don't update any favorite with a smaller data subset
         m_activeResolve = &resolve;
         m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes));
-        m_fetchRequest.setSorting(m_sortOrder);
         m_fetchRequest.start();
 
         m_fetchProcessedCount = 0;
@@ -1590,14 +1632,14 @@ void SeasideCache::timerEvent(QTimerEvent *event)
 void SeasideCache::contactsAdded(const QList<ContactIdType> &ids)
 {
     if (m_keepPopulated) {
-        updateContacts(ids);
+        updateContacts(ids, &m_changedContacts);
     }
 }
 
 void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
 {
     if (m_keepPopulated) {
-        updateContacts(ids);
+        updateContacts(ids, &m_changedContacts);
     } else {
         // Update these contacts if they're already in the cache
         QList<ContactIdType> presentIds;
@@ -1606,7 +1648,23 @@ void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
                 presentIds.append(id);
             }
         }
-        updateContacts(presentIds);
+        updateContacts(presentIds, &m_changedContacts);
+    }
+}
+
+void SeasideCache::contactsPresenceChanged(const QList<ContactIdType> &ids)
+{
+    if (m_keepPopulated) {
+        updateContacts(ids, &m_presenceChangedContacts);
+    } else {
+        // Update these contacts if they're already in the cache
+        QList<ContactIdType> presentIds;
+        foreach (const ContactIdType &id, ids) {
+            if (existingItem(id)) {
+                presentIds.append(id);
+            }
+        }
+        updateContacts(presentIds, &m_presenceChangedContacts);
     }
 }
 
@@ -1660,7 +1718,7 @@ void SeasideCache::updateContacts()
             contactIds.append(it->apiId());
     }
 
-    updateContacts(contactIds);
+    updateContacts(contactIds, &m_changedContacts);
 }
 
 void SeasideCache::fetchContacts()
@@ -1686,7 +1744,7 @@ void SeasideCache::fetchContacts()
     }
 }
 
-void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds)
+void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds, QList<ContactIdType> *updateList)
 {
     // Wait for new changes to be reported
     static const int PostponementIntervalMs = 500;
@@ -1696,7 +1754,7 @@ void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds)
 
     if (!contactIds.isEmpty()) {
         m_contactsUpdated = true;
-        m_changedContacts.append(contactIds);
+        updateList->append(contactIds);
 
         if (m_fetchPostponed.isValid()) {
             // We are waiting to accumulate further changes
@@ -1919,7 +1977,6 @@ void SeasideCache::contactsAvailable()
         m_fetchProcessedCount += contacts.count();
         fetchHint = m_fetchRequest.fetchHint();
     }
-
     if (contacts.isEmpty())
         return;
 
@@ -2411,7 +2468,6 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             // Re-fetch the non-favorites
             m_fetchRequest.setFilter(nonfavoriteFilter());
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
-            m_fetchRequest.setSorting(m_sortOrder);
             m_fetchRequest.start();
             m_fetchProcessedCount = 0;
 
