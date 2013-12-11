@@ -2019,7 +2019,13 @@ void SeasideCache::contactsAvailable()
         FilterType type(m_populateProgress == FetchFavorites ? FilterFavorites
                                                              : (m_populateProgress == FetchMetadata ? FilterAll
                                                                                                     : FilterOnline));
-        m_contactsToAppend.insert(type, qMakePair(queryDetailTypes, contacts));
+        QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToAppend.find(type);
+        if (it != m_contactsToAppend.end()) {
+            // All populate queries have the same detail types, so we can append this list to the existing one
+            it.value().second.append(contacts);
+        } else {
+            m_contactsToAppend.insert(type, qMakePair(queryDetailTypes, contacts));
+        }
     } else {
         if (m_activeResolve) {
             // Process these results immediately
