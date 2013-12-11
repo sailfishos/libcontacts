@@ -1406,8 +1406,16 @@ bool SeasideCache::event(QEvent *event)
         return QObject::event(event);
 
     // Test these conditions in priority order
-    if ((!m_relationshipsToSave.isEmpty() && !m_relationshipSaveRequest.isActive()) ||
-        (!m_relationshipsToRemove.isEmpty() && !m_relationshipRemoveRequest.isActive())) {
+    if (!m_unknownResolveAddresses.isEmpty()) {
+        while (!m_unknownResolveAddresses.isEmpty()) {
+            const ResolveData &resolve = m_unknownResolveAddresses.takeFirst();
+            resolve.listener->addressResolved(resolve.first, resolve.second, 0);
+        }
+
+        // Send another event to trigger further processing
+        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
+    } else if ((!m_relationshipsToSave.isEmpty() && !m_relationshipSaveRequest.isActive()) ||
+               (!m_relationshipsToRemove.isEmpty() && !m_relationshipRemoveRequest.isActive())) {
         // this has to be before contact saves are processed so that the disaggregation flow
         // works properly
         if (!m_relationshipsToSave.isEmpty()) {
@@ -2951,7 +2959,22 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
     data.requireComplete = requireComplete;
     data.listener = listener;
 
-    m_resolveAddresses.append(data);
+    // Is this address a known-unknown?
+    bool knownUnknown = false;
+    QList<ResolveData>::const_iterator it = instancePtr->m_unknownAddresses.constBegin(), end = m_unknownAddresses.constEnd();
+    for ( ; it != end; ++it) {
+        if (it->first == first && it->second == second) {
+            knownUnknown = true;
+            break;
+        }
+    }
+
+    if (knownUnknown) {
+        m_unknownResolveAddresses.append(data);
+    } else {
+        m_resolveAddresses.append(data);
+    }
+
     requestUpdate();
 }
 
