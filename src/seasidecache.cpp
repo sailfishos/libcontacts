@@ -1796,7 +1796,9 @@ void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool pa
         item->contactState = ContactComplete;
     }
 
-    item->statusFlags = contact.detail<QContactStatusFlags>().flagsValue();
+    // Preserve the value of HasValidOnlineAccount, which is held only in the cache
+    const int hasValidFlagValue = item->statusFlags & HasValidOnlineAccount;
+    item->statusFlags = contact.detail<QContactStatusFlags>().flagsValue() | hasValidFlagValue;
 
     if (item->itemData) {
         item->itemData->updateContact(contact, &item->contact, item->contactState);
