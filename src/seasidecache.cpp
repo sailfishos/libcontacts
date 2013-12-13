@@ -2483,6 +2483,12 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchFavorites;
             activityCompleted = false;
         } else if (m_populateProgress == FetchFavorites) {
+            if (m_contactsToAppend.find(FilterFavorites) == m_contactsToAppend.end()) {
+                // No pending contacts, the models are now populated
+                makePopulated(FilterFavorites);
+                qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
+            }
+
             // Next, query for all contacts (except favorites)
             // Request the metadata of all contacts (only data from the primary table)
             m_fetchRequest.setFilter(allFilter());
@@ -2495,6 +2501,12 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchMetadata;
             activityCompleted = false;
         } else if (m_populateProgress == FetchMetadata) {
+            if (m_contactsToAppend.find(FilterAll) == m_contactsToAppend.end()) {
+                makePopulated(FilterNone);
+                makePopulated(FilterAll);
+                qDebug() << "All queried in" << m_timer.elapsed() << "ms";
+            }
+
             // Now query for online contacts
             m_fetchRequest.setFilter(onlineFilter());
             m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes));
@@ -2505,6 +2517,11 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_populateProgress = FetchOnline;
             activityCompleted = false;
         } else if (m_populateProgress == FetchOnline) {
+            if (m_contactsToAppend.find(FilterOnline) == m_contactsToAppend.end()) {
+                makePopulated(FilterOnline);
+                qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
+            }
+
             m_populateProgress = Populated;
         } else if (m_populateProgress == RefetchFavorites) {
             // Re-fetch the non-favorites
