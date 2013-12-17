@@ -2035,7 +2035,7 @@ void SeasideCache::contactsAvailable()
             m_contactsToAppend.insert(type, qMakePair(queryDetailTypes, contacts));
         }
     } else {
-        if (m_activeResolve) {
+        if (m_activeResolve || (request == &m_fetchByIdRequest)) {
             // Process these results immediately
             applyContactUpdates(contacts, partialFetch, queryDetailTypes);
         } else {
