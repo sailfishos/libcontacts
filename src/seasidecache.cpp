@@ -2073,23 +2073,21 @@ void SeasideCache::applyPendingContactUpdates()
         const bool partialFetch = !detailTypes.isEmpty();
 
         QList<QContact> &appendedContacts((*it).second);
-        appendContacts(QList<QContact>() << appendedContacts.takeFirst(), type, partialFetch, detailTypes);
+        appendContacts(appendedContacts, type, partialFetch, detailTypes);
 
-        if (appendedContacts.isEmpty()) {
-            m_contactsToAppend.erase(it);
+        m_contactsToAppend.erase(it);
 
-            // This list has been processed - have we finished populating the group?
-            if (type == FilterFavorites && (m_populateProgress != FetchFavorites)) {
-                makePopulated(FilterFavorites);
-                qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
-            } else if (type == FilterAll && (m_populateProgress != FetchMetadata)) {
-                makePopulated(FilterNone);
-                makePopulated(FilterAll);
-                qDebug() << "All queried in" << m_timer.elapsed() << "ms";
-            } else if (type == FilterOnline && (m_populateProgress != FetchOnline)) {
-                makePopulated(FilterOnline);
-                qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
-            }
+        // This list has been processed - have we finished populating the group?
+        if (type == FilterFavorites && (m_populateProgress != FetchFavorites)) {
+            makePopulated(FilterFavorites);
+            qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
+        } else if (type == FilterAll && (m_populateProgress != FetchMetadata)) {
+            makePopulated(FilterNone);
+            makePopulated(FilterAll);
+            qDebug() << "All queried in" << m_timer.elapsed() << "ms";
+        } else if (type == FilterOnline && (m_populateProgress != FetchOnline)) {
+            makePopulated(FilterOnline);
+            qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
         }
     } else {
         QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
