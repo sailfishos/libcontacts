@@ -1574,6 +1574,49 @@ bool SeasideCache::event(QEvent *event)
         }
     }
 
+    if (!m_resolveAddresses.isEmpty()) {
+        if (m_fetchRequest.isActive()) {
+            requestPending = true;
+        } else {
+            const ResolveData &resolve = m_resolveAddresses.first();
+
+            if (resolve.first.isEmpty()) {
+                // Search for phone number
+                m_fetchRequest.setFilter(QContactPhoneNumber::match(resolve.second));
+            } else if (resolve.second.isEmpty()) {
+                // Search for email address
+                QContactDetailFilter detailFilter;
+                setDetailType<QContactEmailAddress>(detailFilter, QContactEmailAddress::FieldEmailAddress);
+                detailFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
+                detailFilter.setValue(resolve.first);
+
+                m_fetchRequest.setFilter(detailFilter);
+            } else {
+                // Search for online account
+                QContactDetailFilter localFilter;
+                setDetailType<QContactOnlineAccount>(localFilter, QContactOnlineAccount__FieldAccountPath);
+                localFilter.setValue(resolve.first);
+
+                QContactDetailFilter remoteFilter;
+                setDetailType<QContactOnlineAccount>(remoteFilter, QContactOnlineAccount::FieldAccountUri);
+                remoteFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
+                remoteFilter.setValue(resolve.second);
+
+                m_fetchRequest.setFilter(localFilter & remoteFilter);
+            }
+
+            // If completion is not required, we need to at least retrieve as much detail
+            // as the favorites store, so we don't update any favorite with a smaller data subset
+            m_activeResolve = &resolve;
+            m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes));
+            m_fetchRequest.start();
+
+            m_fetchProcessedCount = 0;
+
+            return true;
+        }
+    }
+
     if (!m_changedContacts.isEmpty()) {
         if (m_fetchRequest.isActive()) {
             requestPending = true;
@@ -1642,49 +1685,6 @@ bool SeasideCache::event(QEvent *event)
         // Send another event to trigger further processing
         QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
         return true;
-    }
-
-    if (!m_resolveAddresses.isEmpty()) {
-        if (m_fetchRequest.isActive()) {
-            requestPending = true;
-        } else {
-            const ResolveData &resolve = m_resolveAddresses.first();
-
-            if (resolve.first.isEmpty()) {
-                // Search for phone number
-                m_fetchRequest.setFilter(QContactPhoneNumber::match(resolve.second));
-            } else if (resolve.second.isEmpty()) {
-                // Search for email address
-                QContactDetailFilter detailFilter;
-                setDetailType<QContactEmailAddress>(detailFilter, QContactEmailAddress::FieldEmailAddress);
-                detailFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
-                detailFilter.setValue(resolve.first);
-
-                m_fetchRequest.setFilter(detailFilter);
-            } else {
-                // Search for online account
-                QContactDetailFilter localFilter;
-                setDetailType<QContactOnlineAccount>(localFilter, QContactOnlineAccount__FieldAccountPath);
-                localFilter.setValue(resolve.first);
-
-                QContactDetailFilter remoteFilter;
-                setDetailType<QContactOnlineAccount>(remoteFilter, QContactOnlineAccount::FieldAccountUri);
-                remoteFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
-                remoteFilter.setValue(resolve.second);
-
-                m_fetchRequest.setFilter(localFilter & remoteFilter);
-            }
-
-            // If completion is not required, we need to at least retrieve as much detail
-            // as the favorites store, so we don't update any favorite with a smaller data subset
-            m_activeResolve = &resolve;
-            m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes));
-            m_fetchRequest.start();
-
-            m_fetchProcessedCount = 0;
-
-            return true;
-        }
     }
 
     if (m_refreshRequired) {
