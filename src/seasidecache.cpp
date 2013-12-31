@@ -1346,8 +1346,12 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
     }
 
     // Phone number match
-    foreach (const QContactPhoneNumber &number, contact.details<QContactPhoneNumber>()) {
-        rv = rv | QContactPhoneNumber::match(number.number());
+    foreach (const QContactPhoneNumber &phoneNumber, contact.details<QContactPhoneNumber>()) {
+        const QString number(phoneNumber.number());
+        if (number.isEmpty())
+            continue;
+
+        rv = rv | QContactPhoneNumber::match(number);
     }
 
     // Email address match
@@ -1358,6 +1362,9 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
             // Match any address that is the same up to the @ symbol
             address = address.left(index);
         }
+
+        if (address.isEmpty())
+            continue;
 
         QContactDetailFilter filter;
         setDetailType<QContactEmailAddress>(filter, QContactEmailAddress::FieldEmailAddress);
@@ -1374,6 +1381,9 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
             // Match any account URI that is the same up to the @ symbol
             uri = uri.left(index);
         }
+
+        if (uri.isEmpty())
+            continue;
 
         QContactDetailFilter filter;
         setDetailType<QContactOnlineAccount>(filter, QContactOnlineAccount::FieldAccountUri);
