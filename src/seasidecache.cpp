@@ -232,6 +232,33 @@ QContactFetchHint favoriteFetchHint(quint32 fetchTypes = 0)
     return fetchHint;
 }
 
+QContactFetchHint extendedMetadataFetchHint(quint32 fetchTypes)
+{
+    QContactFetchHint fetchHint(basicFetchHint());
+
+    DetailList types;
+
+    // Only query for the specific types we need
+    if (fetchTypes & SeasideCache::FetchAccountUri) {
+        types << detailType<QContactOnlineAccount>();
+    }
+    if (fetchTypes & SeasideCache::FetchPhoneNumber) {
+        types << detailType<QContactPhoneNumber>();
+    }
+    if (fetchTypes & SeasideCache::FetchEmailAddress) {
+        types << detailType<QContactEmailAddress>();
+    }
+    if (fetchTypes & SeasideCache::FetchNickname) {
+        types << detailType<QContactNickname>();
+    }
+    if (fetchTypes & SeasideCache::FetchOrganization) {
+        types << detailType<QContactOrganization>();
+    }
+
+    setDetailTypesHint(fetchHint, types);
+    return fetchHint;
+}
+
 QContactFilter allFilter()
 {
     return QContactFilter();
@@ -1703,6 +1730,45 @@ bool SeasideCache::event(QEvent *event)
     }
 
     if (!requestPending) {
+        // No remaining work is pending - do we have any background tasks?
+
+        if (m_keepPopulated) {
+            // Load extra data items that we want to be able to search on, if not already fetched
+            const quint32 fetchMask = (SeasideCache::FetchNickname |
+                                       SeasideCache::FetchOrganization |
+                                       SeasideCache::FetchPhoneNumber |
+                                       SeasideCache::FetchEmailAddress |
+                                       SeasideCache::FetchAccountUri);
+
+            if ((m_fetchTypes & fetchMask) != fetchMask) {
+                m_fetchRequest.setFilter(allFilter());
+
+                quint32 fetchType = 0;
+                if ((m_fetchTypes & SeasideCache::FetchNickname) == 0) {
+                    fetchType = SeasideCache::FetchNickname;
+                } else if ((m_fetchTypes & SeasideCache::FetchOrganization) == 0) {
+                    fetchType = SeasideCache::FetchOrganization;
+                } else if ((m_fetchTypes & SeasideCache::FetchPhoneNumber) == 0) {
+                    fetchType = SeasideCache::FetchPhoneNumber;
+                    m_fetchRequest.setFilter(QContactStatusFlags::matchFlag(QContactStatusFlags::HasPhoneNumber, QContactFilter::MatchContains));
+                } else if ((m_fetchTypes & SeasideCache::FetchEmailAddress) == 0) {
+                    fetchType = SeasideCache::FetchEmailAddress;
+                    m_fetchRequest.setFilter(QContactStatusFlags::matchFlag(QContactStatusFlags::HasEmailAddress, QContactFilter::MatchContains));
+                } else {
+                    fetchType = SeasideCache::FetchAccountUri;
+                    m_fetchRequest.setFilter(QContactStatusFlags::matchFlag(QContactStatusFlags::HasOnlineAccount, QContactFilter::MatchContains));
+                }
+
+                m_fetchRequest.setFetchHint(extendedMetadataFetchHint(fetchType));
+                m_fetchRequest.start();
+
+                m_fetchProcessedCount = 0;
+                m_fetchTypes |= fetchType;
+
+                return true;
+            }
+        }
+
         m_updatesPending = false;
 
         // Remove expired contacts when all other activity has been processed

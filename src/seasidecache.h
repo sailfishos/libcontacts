@@ -102,7 +102,9 @@ public:
         FetchNone = 0,
         FetchAccountUri = (1 << 0),
         FetchPhoneNumber = (1 << 1),
-        FetchEmailAddress = (1 << 2)
+        FetchEmailAddress = (1 << 2),
+        FetchNickname = (1 << 3),
+        FetchOrganization = (1 << 4)
     };
 
     enum DisplayLabelOrder {
