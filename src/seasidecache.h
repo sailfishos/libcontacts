@@ -103,8 +103,11 @@ public:
         FetchAccountUri = (1 << 0),
         FetchPhoneNumber = (1 << 1),
         FetchEmailAddress = (1 << 2),
-        FetchNickname = (1 << 3),
-        FetchOrganization = (1 << 4)
+        FetchOrganization = (1 << 3),
+        FetchTypesMask = (FetchAccountUri |
+                          FetchPhoneNumber |
+                          FetchEmailAddress |
+                          FetchOrganization)
     };
 
     enum DisplayLabelOrder {
@@ -279,7 +282,7 @@ public:
     static quint32 internalId(QContactLocalId id);
 #endif
 
-    static void registerModel(ListModel *model, FilterType type, FetchDataType extraData = FetchNone);
+    static void registerModel(ListModel *model, FilterType type, FetchDataType requiredTypes = FetchNone, FetchDataType extraTypes = FetchNone);
     static void unregisterModel(ListModel *model);
 
     static void registerUser(QObject *user);
@@ -389,9 +392,7 @@ private:
         FetchFavorites,
         FetchMetadata,
         FetchOnline,
-        Populated,
-        RefetchFavorites,
-        RefetchOthers
+        Populated
     };
 
     SeasideCache();
@@ -399,7 +400,7 @@ private:
 
     static void checkForExpiry();
 
-    void keepPopulated(quint32 fetchTypes);
+    void keepPopulated(quint32 requiredTypes, quint32 extraTypes);
 
     void requestUpdate();
     void appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
@@ -496,7 +497,8 @@ private:
     bool m_keepPopulated;
     PopulateProgress m_populateProgress;
     quint32 m_fetchTypes;
-    bool m_fetchTypesChanged;
+    quint32 m_extraFetchTypes;
+    quint32 m_dataTypesFetched;
     bool m_updatesPending;
     bool m_refreshRequired;
     bool m_contactsUpdated;
