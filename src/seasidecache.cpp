@@ -63,6 +63,7 @@
 #include <QContactPhoneNumber>
 #include <QContactGlobalPresence>
 #include <QContactSyncTarget>
+#include <QContactTimestamp>
 
 #include <QVersitContactExporter>
 #include <QVersitContactImporter>
@@ -187,18 +188,28 @@ QContactFetchHint presenceFetchHint()
     return fetchHint;
 }
 
+DetailList contactsTableDetails()
+{
+    DetailList types;
+
+    // These details are reported in every query
+    types << detailType<QContactSyncTarget>() <<
+             detailType<QContactName>() <<
+             detailType<QContactDisplayLabel>() <<
+             detailType<QContactFavorite>() <<
+             detailType<QContactTimestamp>() <<
+             detailType<QContactGender>() <<
+             detailType<QContactStatusFlags>();
+
+    return types;
+}
+
 QContactFetchHint metadataFetchHint(quint32 fetchTypes = 0)
 {
     QContactFetchHint fetchHint(basicFetchHint());
 
     // Include all detail types which come from the main contacts table
-    DetailList types;
-    types << detailType<QContactSyncTarget>() <<
-             detailType<QContactName>() <<
-             detailType<QContactDisplayLabel>() <<
-             detailType<QContactFavorite>() <<
-             detailType<QContactGender>() <<
-             detailType<QContactStatusFlags>();
+    DetailList types(contactsTableDetails());
 
     // Include nickname, as some contacts have no other name
     types << detailType<QContactNickname>();
@@ -2206,7 +2217,13 @@ void updateDetailsFromCache(QContact &contact, SeasideCache::CacheItem *item, co
 {
     // Copy any existing detail types that are in the current record to the new instance
     foreach (const QContactDetail &existing, item->contact.details()) {
-        if (!queryDetailTypes.contains(detailType(existing))) {
+        const DetailTypeId existingType(detailType(existing));
+
+        static const DetailList contactsTableTypes(contactsTableDetails());
+
+        // The queried contact already contains any types in the contacts table, and those
+        // types explicitly fetched by the query
+        if (!queryDetailTypes.contains(existingType) && !contactsTableTypes.contains(existingType)) {
             QContactDetail copy(existing);
             contact.saveDetail(&copy);
         }
