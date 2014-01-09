@@ -2311,21 +2311,35 @@ void SeasideCache::applyPendingContactUpdates()
         const bool partialFetch = !detailTypes.isEmpty();
 
         QList<QContact> &appendedContacts((*it).second);
-        appendContacts(appendedContacts, type, partialFetch, detailTypes);
 
-        m_contactsToAppend.erase(it);
+        const int maxBatchSize = 200;
+        const int minBatchSize = 50;
 
-        // This list has been processed - have we finished populating the group?
-        if (type == FilterFavorites && (m_populateProgress != FetchFavorites)) {
-            makePopulated(FilterFavorites);
-            qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
-        } else if (type == FilterAll && (m_populateProgress != FetchMetadata)) {
-            makePopulated(FilterNone);
-            makePopulated(FilterAll);
-            qDebug() << "All queried in" << m_timer.elapsed() << "ms";
-        } else if (type == FilterOnline && (m_populateProgress != FetchOnline)) {
-            makePopulated(FilterOnline);
-            qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
+        if (appendedContacts.count() < maxBatchSize) {
+            // For a small number of contacts, append all at once
+            appendContacts(appendedContacts, type, partialFetch, detailTypes);
+            appendedContacts.clear();
+        } else {
+            // Append progressively in batches
+            appendContacts(appendedContacts.mid(0, minBatchSize), type, partialFetch, detailTypes);
+            appendedContacts = appendedContacts.mid(minBatchSize);
+        }
+
+        if (appendedContacts.isEmpty()) {
+            m_contactsToAppend.erase(it);
+
+            // This list has been processed - have we finished populating the group?
+            if (type == FilterFavorites && (m_populateProgress != FetchFavorites)) {
+                makePopulated(FilterFavorites);
+                qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
+            } else if (type == FilterAll && (m_populateProgress != FetchMetadata)) {
+                makePopulated(FilterNone);
+                makePopulated(FilterAll);
+                qDebug() << "All queried in" << m_timer.elapsed() << "ms";
+            } else if (type == FilterOnline && (m_populateProgress != FetchOnline)) {
+                makePopulated(FilterOnline);
+                qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
+            }
         }
     } else {
         QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
