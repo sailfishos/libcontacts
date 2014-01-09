@@ -363,6 +363,7 @@ public:
 protected:
     void timerEvent(QTimerEvent *event);
     void setSortOrder(const QString &property);
+    void startRequest(bool *idleProcessing);
 
 private slots:
     void contactsAvailable();
