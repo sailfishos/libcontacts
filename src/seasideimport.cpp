@@ -102,10 +102,25 @@ QContactFilter localContactFilter()
     return filterLocal | filterWasLocal;
 }
 
+bool nameIsEmpty(const QContactName &name)
+{
+    if (name.isEmpty())
+        return true;
+
+    return (name.prefix().isEmpty() &&
+            name.firstName().isEmpty() &&
+            name.middleName().isEmpty() &&
+            name.lastName().isEmpty() &&
+            name.suffix().isEmpty());
+}
+
 QString contactNameString(const QContact &contact)
 {
     QStringList details;
     QContactName name(contact.detail<QContactName>());
+    if (nameIsEmpty(name))
+        return QString();
+
     details.append(name.prefix());
     details.append(name.firstName());
     details.append(name.middleName());
@@ -329,25 +344,35 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         QContact &contact(*it);
 
         const QString guid = contact.detail<QContactGuid>().guid();
-        const bool emptyName = contact.detail<QContactName>().isEmpty();
         const QString name = contactNameString(contact);
-        const QString label = contact.detail<QContactDisplayLabel>().label();
+        const bool emptyName = name.isEmpty();
+
+        QString label;
+        if (emptyName) {
+            QContactName nameDetail = contact.detail<QContactName>();
+            contact.removeDetail(&nameDetail);
+
+            label = contact.detail<QContactDisplayLabel>().label();
+            if (label.isEmpty()) {
+                label = SeasideCache::generateDisplayLabelFromNonNameDetails(contact);
+            }
+        }
 
         int previousIndex = -1;
         QHash<QString, int>::const_iterator git = importGuids.find(guid);
         if (git != importGuids.end()) {
             previousIndex = git.value();
         } else {
-            QHash<QString, int>::const_iterator nit = importNames.find(name);
-            if (nit != importNames.end()) {
-                previousIndex = nit.value();
-            } else {
+            if (!emptyName) {
+                QHash<QString, int>::const_iterator nit = importNames.find(name);
+                if (nit != importNames.end()) {
+                    previousIndex = nit.value();
+                }
+            } else if (!label.isEmpty()) {
                 // Only if name is empty, use displayLabel - probably SIM import
-                if (emptyName) {
-                    QHash<QString, int>::const_iterator lit = importLabels.find(label);
-                    if (lit != importLabels.end()) {
-                        previousIndex = lit.value();
-                    }
+                QHash<QString, int>::const_iterator lit = importLabels.find(label);
+                if (lit != importLabels.end()) {
+                    previousIndex = lit.value();
                 }
             }
         }
@@ -368,8 +393,10 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
             } else if (!label.isEmpty()) {
                 importLabels.insert(label, index);
 
-                // Modify this contact to have the label as a nickname
-                setNickname(contact, label);
+                if (contact.details<QContactNickname>().isEmpty()) {
+                    // Modify this contact to have the label as a nickname
+                    setNickname(contact, label);
+                }
             }
 
             ++it;
@@ -414,37 +441,33 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
         QContactId existingId;
 
-        bool existing = true;
         QHash<QString, QContactId>::const_iterator git = existingGuids.find(guid);
         if (git != existingGuids.end()) {
             existingId = *git;
         } else {
-            const bool emptyName = (*it).detail<QContactName>().isEmpty();
+            const bool emptyName = nameIsEmpty((*it).detail<QContactName>());
             if (!emptyName) {
                 const QString name = contactNameString(*it);
 
                 QHash<QString, QContactId>::const_iterator nit = existingNames.find(name);
                 if (nit != existingNames.end()) {
                     existingId = *nit;
-                } else {
-                    existing = false;
                 }
             } else {
-                const QString label = (*it).detail<QContactDisplayLabel>().label();
-                if (!label.isEmpty()) {
-                    QHash<QString, QContactId>::const_iterator nit = existingNicknames.find(label);
-                    if (nit != existingNicknames.end()) {
-                        existingId = *nit;
-                    } else {
-                        existing = false;
+                foreach (const QContactNickname nick, (*it).details<QContactNickname>()) {
+                    const QString nickname(nick.nickname());
+                    if (!nickname.isEmpty()) {
+                        QHash<QString, QContactId>::const_iterator nit = existingNicknames.find(nickname);
+                        if (nit != existingNicknames.end()) {
+                            existingId = *nit;
+                            break;
+                        }
                     }
-                } else {
-                    existing = false;
                 }
             }
         }
 
-        if (existing) {
+        if (!existingId.isNull()) {
             QMap<QContactId, int>::iterator eit = existingIds.find(existingId);
             if (eit == existingIds.end()) {
                 existingIds.insert(existingId, (it - importedContacts.begin()));
