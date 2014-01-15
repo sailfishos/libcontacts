@@ -310,12 +310,6 @@ void tst_SeasideImport::nonmergedNickname()
 
 void tst_SeasideImport::nonmergedUid()
 {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
-    QSKIP("UID matches should be ignored where QContactName details differ");
-#else
-    QSKIP("UID matches should be ignored where QContactName details differ", SkipAll);
-#endif
-
     const char *vCardData =
 "BEGIN:VCARD\r\n"
 "N:Springfield;Jebediah;;;\r\n"
