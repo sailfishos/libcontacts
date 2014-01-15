@@ -524,6 +524,7 @@ private:
     QElapsedTimer m_fetchPostponed;
 
     static SeasideCache *instancePtr;
+    static int contactNameGroupCount;
     static QStringList allContactNameGroups;
 };
 
