@@ -102,10 +102,25 @@ QContactFilter localContactFilter()
     return filterLocal | filterWasLocal;
 }
 
+bool nameIsEmpty(const QContactName &name)
+{
+    if (name.isEmpty())
+        return true;
+
+    return (name.prefix().isEmpty() &&
+            name.firstName().isEmpty() &&
+            name.middleName().isEmpty() &&
+            name.lastName().isEmpty() &&
+            name.suffix().isEmpty());
+}
+
 QString contactNameString(const QContact &contact)
 {
     QStringList details;
     QContactName name(contact.detail<QContactName>());
+    if (nameIsEmpty(name))
+        return QString();
+
     details.append(name.prefix());
     details.append(name.firstName());
     details.append(name.middleName());
@@ -329,25 +344,49 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         QContact &contact(*it);
 
         const QString guid = contact.detail<QContactGuid>().guid();
-        const bool emptyName = contact.detail<QContactName>().isEmpty();
         const QString name = contactNameString(contact);
-        const QString label = contact.detail<QContactDisplayLabel>().label();
+        const bool emptyName = name.isEmpty();
+
+        QString label;
+        if (emptyName) {
+            QContactName nameDetail = contact.detail<QContactName>();
+            contact.removeDetail(&nameDetail);
+
+            label = contact.detail<QContactDisplayLabel>().label();
+            if (label.isEmpty()) {
+                label = SeasideCache::generateDisplayLabelFromNonNameDetails(contact);
+            }
+        }
 
         int previousIndex = -1;
         QHash<QString, int>::const_iterator git = importGuids.find(guid);
         if (git != importGuids.end()) {
             previousIndex = git.value();
-        } else {
-            QHash<QString, int>::const_iterator nit = importNames.find(name);
-            if (nit != importNames.end()) {
-                previousIndex = nit.value();
-            } else {
+
+            if (!emptyName) {
+                // If we have a GUID match, but names differ, ignore the match
+                const QContact &previous(importedContacts[previousIndex]);
+                const QString previousName = contactNameString(previous);
+                if (!previousName.isEmpty() && (previousName != name)) {
+                    previousIndex = -1;
+
+                    // Remove the conflicting GUID from this contact
+                    QContactGuid guidDetail = contact.detail<QContactGuid>();
+                    contact.removeDetail(&guidDetail);
+                }
+            }
+        }
+        if (previousIndex == -1) {
+            if (!emptyName) {
+                QHash<QString, int>::const_iterator nit = importNames.find(name);
+                if (nit != importNames.end()) {
+                    previousIndex = nit.value();
+                }
+            } else if (!label.isEmpty()) {
                 // Only if name is empty, use displayLabel - probably SIM import
-                if (emptyName) {
-                    QHash<QString, int>::const_iterator lit = importLabels.find(label);
-                    if (lit != importLabels.end()) {
-                        previousIndex = lit.value();
-                    }
+                QHash<QString, int>::const_iterator lit = importLabels.find(label);
+                if (lit != importLabels.end()) {
+                    previousIndex = lit.value();
                 }
             }
         }
@@ -368,8 +407,10 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
             } else if (!label.isEmpty()) {
                 importLabels.insert(label, index);
 
-                // Modify this contact to have the label as a nickname
-                setNickname(contact, label);
+                if (contact.details<QContactNickname>().isEmpty()) {
+                    // Modify this contact to have the label as a nickname
+                    setNickname(contact, label);
+                }
             }
 
             ++it;
@@ -386,6 +427,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
     QHash<QString, QContactId> existingGuids;
     QHash<QString, QContactId> existingNames;
+    QMap<QContactId, QString> existingContactNames;
     QHash<QString, QContactId> existingNicknames;
 
     QContactManager *mgr(SeasideCache::manager());
@@ -399,6 +441,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
         }
         if (!name.isEmpty()) {
             existingNames.insert(name, contact.id());
+            existingContactNames.insert(contact.id(), name);
         }
         foreach (const QContactNickname &nick, contact.details<QContactNickname>()) {
             existingNicknames.insert(nick.nickname(), contact.id());
@@ -411,40 +454,51 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     it = importedContacts.begin();
     while (it != importedContacts.end()) {
         const QString guid = (*it).detail<QContactGuid>().guid();
+        const QString name = contactNameString(*it);
+        const bool emptyName = name.isEmpty();
 
         QContactId existingId;
 
-        bool existing = true;
         QHash<QString, QContactId>::const_iterator git = existingGuids.find(guid);
         if (git != existingGuids.end()) {
             existingId = *git;
-        } else {
-            const bool emptyName = (*it).detail<QContactName>().isEmpty();
-            if (!emptyName) {
-                const QString name = contactNameString(*it);
 
+            if (!emptyName) {
+                // If we have a GUID match, but names differ, ignore the match
+                QMap<QContactId, QString>::iterator nit = existingContactNames.find(existingId);
+                if (nit != existingContactNames.end()) {
+                    const QString &existingName(*nit);
+                    if (!existingName.isEmpty() && (existingName != name)) {
+                        existingId = QContactId();
+
+                        // Remove the conflicting GUID from this contact
+                        QContactGuid guidDetail = (*it).detail<QContactGuid>();
+                        (*it).removeDetail(&guidDetail);
+                    }
+                }
+            }
+        }
+        if (existingId.isNull()) {
+            if (!emptyName) {
                 QHash<QString, QContactId>::const_iterator nit = existingNames.find(name);
                 if (nit != existingNames.end()) {
                     existingId = *nit;
-                } else {
-                    existing = false;
                 }
             } else {
-                const QString label = (*it).detail<QContactDisplayLabel>().label();
-                if (!label.isEmpty()) {
-                    QHash<QString, QContactId>::const_iterator nit = existingNicknames.find(label);
-                    if (nit != existingNicknames.end()) {
-                        existingId = *nit;
-                    } else {
-                        existing = false;
+                foreach (const QContactNickname nick, (*it).details<QContactNickname>()) {
+                    const QString nickname(nick.nickname());
+                    if (!nickname.isEmpty()) {
+                        QHash<QString, QContactId>::const_iterator nit = existingNicknames.find(nickname);
+                        if (nit != existingNicknames.end()) {
+                            existingId = *nit;
+                            break;
+                        }
                     }
-                } else {
-                    existing = false;
                 }
             }
         }
 
-        if (existing) {
+        if (!existingId.isNull()) {
             QMap<QContactId, int>::iterator eit = existingIds.find(existingId);
             if (eit == existingIds.end()) {
                 existingIds.insert(existingId, (it - importedContacts.begin()));
