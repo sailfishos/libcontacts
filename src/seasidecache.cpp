@@ -95,6 +95,11 @@ const QString aggregateRelationshipType =
 const QString syncTargetLocal = QLatin1String("local");
 const QString syncTargetWasLocal = QLatin1String("was_local");
 
+int getContactNameGroupCount()
+{
+    return mLocale.exemplarCharactersIndex().count();
+}
+
 QStringList getAllContactNameGroups()
 {
     QStringList groups(mLocale.exemplarCharactersIndex());
@@ -465,6 +470,7 @@ int bestPhoneNumberMatchLength(const QContact &contact, const QString &match)
 }
 
 SeasideCache *SeasideCache::instancePtr = 0;
+int SeasideCache::contactNameGroupCount = getContactNameGroupCount();
 QStringList SeasideCache::allContactNameGroups = getAllContactNameGroups();
 
 QContactManager* SeasideCache::manager()
@@ -768,6 +774,7 @@ void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
     instancePtr->m_nameGrouper.reset(grouper);
 
     allContactNameGroups = instancePtr->m_nameGrouper->allNameGroups();
+    contactNameGroupCount = allContactNameGroups.count();
     if (!allContactNameGroups.contains(QLatin1String("#")))
         allContactNameGroups << QLatin1String("#");
 }
@@ -802,9 +809,30 @@ QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
         group = mLocale.indexBucket(cacheItem->displayLabel);
     }
 
-    if (group.isNull() || !allContactNameGroups.contains(group)) {
-        group = QString::fromLatin1("#");   // 'other' group
+    if (!group.isEmpty()) {
+        if (!allContactNameGroups.contains(group)) {
+            // If this group is some kind of digit, group under '#'
+            if (mLocale.toLatinNumbers(group.mid(0, 1)).at(0).isDigit()) {
+                group = QString();
+            }
+        }
     }
+
+    if (group.isEmpty()) {
+        group = QString::fromLatin1("#");
+    } else if (!allContactNameGroups.contains(group)) {
+        // Insert before the '#' group, which is always last, and after the pre-defined groups
+        const int maxIndex = allContactNameGroups.count() - 1;
+        int index = qMin(contactNameGroupCount, maxIndex);
+        for ( ; index < maxIndex; ++index) {
+            if (group < allContactNameGroups.at(index)) {
+                break;
+            }
+        }
+
+        allContactNameGroups.insert(index, group);
+    }
+
     return group;
 }
 
