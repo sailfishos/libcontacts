@@ -40,22 +40,13 @@
 
 #include <QContact>
 
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-# include <QVersitContactImporterPropertyHandlerV2>
-#else
-# include <QVersitContactImporterPropertyHandler>
-#endif
-
+#include <QVersitContactImporterPropertyHandler>
 #include <QVersitResourceHandler>
 #include <QVersitDocument>
 #include <QVersitProperty>
 
-#ifdef USING_QTPIM
 QTCONTACTS_USE_NAMESPACE
 QTVERSIT_USE_NAMESPACE
-#else
-QTM_USE_NAMESPACE
-#endif
 
 /*
     SeasidePropertyHandler

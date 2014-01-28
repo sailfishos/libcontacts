@@ -40,11 +40,7 @@
 #include <private/qcontactmanager_p.h>
 
 #include <QCoreApplication>
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
 #include <QStandardPaths>
-#else
-#include <QDesktopServices>
-#endif
 #include <QDBusConnection>
 #include <QDir>
 #include <QEvent>
@@ -77,20 +73,13 @@
 #include <mce/dbus-names.h>
 #include <mce/mode-names.h>
 
-#ifdef USING_QTPIM
 QTVERSIT_USE_NAMESPACE
-#endif
 
 namespace {
 
 ML10N::MLocale mLocale;
 
-const QString aggregateRelationshipType =
-#ifdef USING_QTPIM
-    QContactRelationship::Aggregates();
-#else
-    QContactRelationship::Aggregates;
-#endif
+const QString aggregateRelationshipType = QContactRelationship::Aggregates();
 
 const QString syncTargetLocal = QLatin1String("local");
 const QString syncTargetWasLocal = QLatin1String("was_local");
@@ -127,48 +116,28 @@ typedef QList<DetailTypeId> DetailList;
 template<typename T>
 DetailTypeId detailType()
 {
-#ifdef USING_QTPIM
     return T::Type;
-#else
-    return T::DefinitionName;
-#endif
 }
 
 DetailTypeId detailType(const QContactDetail &detail)
 {
-#ifdef USING_QTPIM
     return detail.type();
-#else
-    return detail.definitionName();
-#endif
 }
 
 template<typename T, typename Filter, typename Field>
 void setDetailType(Filter &filter, Field field)
 {
-#ifdef USING_QTPIM
     filter.setDetailType(T::Type, field);
-#else
-    filter.setDetailDefinitionName(T::DefinitionName, field);
-#endif
 }
 
 DetailList detailTypesHint(const QContactFetchHint &hint)
 {
-#ifdef USING_QTPIM
     return hint.detailTypesHint();
-#else
-    return hint.detailDefinitionsHint();
-#endif
 }
 
 void setDetailTypesHint(QContactFetchHint &hint, const DetailList &types)
 {
-#ifdef USING_QTPIM
     hint.setDetailTypesHint(types);
-#else
-    hint.setDetailDefinitionsHint(types);
-#endif
 }
 
 QContactFetchHint basicFetchHint()
@@ -485,11 +454,7 @@ SeasideCache* SeasideCache::instance()
 
 SeasideCache::ContactIdType SeasideCache::apiId(const QContact &contact)
 {
-#ifdef USING_QTPIM
     return contact.id();
-#else
-    return contact.id().localId();
-#endif
 }
 
 SeasideCache::ContactIdType SeasideCache::apiId(quint32 iid)
@@ -499,19 +464,8 @@ SeasideCache::ContactIdType SeasideCache::apiId(quint32 iid)
 
 bool SeasideCache::validId(const ContactIdType &id)
 {
-#ifdef USING_QTPIM
     return !id.isNull();
-#else
-    return (id != 0);
-#endif
 }
-
-#ifndef USING_QTPIM
-bool SeasideCache::validId(const QContactId &id)
-{
-    return (id.localId() != 0);
-}
-#endif
 
 quint32 SeasideCache::internalId(const QContact &contact)
 {
@@ -522,13 +476,6 @@ quint32 SeasideCache::internalId(const QContactId &id)
 {
     return QtContactsSqliteExtensions::internalContactId(id);
 }
-
-#ifndef USING_QTPIM
-quint32 SeasideCache::internalId(QContactLocalId id)
-{
-    return QtContactsSqliteExtensions::internalContactId(id);
-}
-#endif
 
 SeasideCache::SeasideCache()
     : m_syncFilter(FilterNone)
@@ -591,7 +538,6 @@ SeasideCache::SeasideCache()
     typedef QtContactsSqliteExtensions::ContactManagerEngine EngineType;
     EngineType *cme = dynamic_cast<EngineType *>(QContactManagerData::managerData(mgr)->m_engine);
 
-#ifdef USING_QTPIM
     connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
@@ -601,17 +547,6 @@ SeasideCache::SeasideCache()
             this, SLOT(contactsPresenceChanged(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactId>)),
             this, SLOT(contactsRemoved(QList<QContactId>)));
-#else
-    connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
-    connect(mgr, SIGNAL(contactsAdded(QList<QContactLocalId>)),
-            this, SLOT(contactsAdded(QList<QContactLocalId>)));
-    connect(mgr, SIGNAL(contactsChanged(QList<QContactLocalId>)),
-            this, SLOT(contactsChanged(QList<QContactLocalId>)));
-    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactLocalId>)),
-            this, SLOT(contactsPresenceChanged(QList<QContactLocalId>)));
-    connect(mgr, SIGNAL(contactsRemoved(QList<QContactLocalId>)),
-            this, SLOT(contactsRemoved(QList<QContactLocalId>)));
-#endif
 
     connect(&m_fetchRequest, SIGNAL(resultsAvailable()), this, SLOT(contactsAvailable()));
     connect(&m_fetchByIdRequest, SIGNAL(resultsAvailable()), this, SLOT(contactsAvailable()));
@@ -889,13 +824,7 @@ SeasideCache::CacheItem *SeasideCache::itemById(const ContactIdType &id, bool re
         item->iid = iid;
         item->contactState = ContactAbsent;
 
-#ifdef USING_QTPIM
         item->contact.setId(id);
-#else
-        QContactId contactId;
-        contactId.setLocalId(id);
-        item->contact.setId(contactId);
-#endif
     }
 
     if (requireComplete) {
@@ -904,7 +833,6 @@ SeasideCache::CacheItem *SeasideCache::itemById(const ContactIdType &id, bool re
     return item;
 }
 
-#ifdef USING_QTPIM
 SeasideCache::CacheItem *SeasideCache::itemById(int id, bool requireComplete)
 {
     if (id != 0) {
@@ -916,21 +844,12 @@ SeasideCache::CacheItem *SeasideCache::itemById(int id, bool requireComplete)
 
     return 0;
 }
-#endif
 
 SeasideCache::CacheItem *SeasideCache::existingItem(const ContactIdType &id)
 {
-#ifdef USING_QTPIM
     return existingItem(internalId(id));
-#else
-    QHash<quint32, CacheItem>::iterator it = instancePtr->m_people.find(id);
-    return it != instancePtr->m_people.end()
-            ? &(*it)
-            : 0;
-#endif
 }
 
-#ifdef USING_QTPIM
 SeasideCache::CacheItem *SeasideCache::existingItem(quint32 iid)
 {
     QHash<quint32, CacheItem>::iterator it = instancePtr->m_people.find(iid);
@@ -938,7 +857,6 @@ SeasideCache::CacheItem *SeasideCache::existingItem(quint32 iid)
             ? &(*it)
             : 0;
 }
-#endif
 
 QContact SeasideCache::contactById(const ContactIdType &id)
 {
@@ -1621,11 +1539,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
         } else {
             // Fetch the constituent information (even if they're already in the
             // cache, because we don't update non-aggregates on change notifications)
-#ifdef USING_QTPIM
             m_fetchByIdRequest.setIds(m_constituentIds.toList());
-#else
-            m_fetchByIdRequest.setLocalIds(m_constituentIds.toList());
-#endif
             m_fetchByIdRequest.start();
 
             m_fetchByIdProcessedCount = 0;
@@ -1639,15 +1553,10 @@ void SeasideCache::startRequest(bool *idleProcessing)
             QContactId aggregateId = m_contactsToFetchConstituents.first();
 
             // Find the constituents of this contact
-#ifdef USING_QTPIM
             QContact first;
             first.setId(aggregateId);
             m_relationshipsFetchRequest.setFirst(first);
             m_relationshipsFetchRequest.setRelationshipType(QContactRelationship::Aggregates());
-#else
-            m_relationshipsFetchRequest.setFirst(aggregateId);
-            m_relationshipsFetchRequest.setRelationshipType(QContactRelationship::Aggregates);
-#endif
             m_relationshipsFetchRequest.start();
         }
     }
@@ -1656,11 +1565,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
         if (m_contactIdRequest.isActive()) {
             requestPending = true;
         } else {
-#ifdef USING_QTPIM
             ContactIdType contactId(m_contactsToFetchCandidates.first());
-#else
-            ContactIdType contactId(m_contactsToFetchCandidates.first().localId());
-#endif
             const QContact contact(contactById(contactId));
 
             // Find candidates to merge with this contact
@@ -1745,11 +1650,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
             // The actual limit is over 800, but we should reduce further to increase interactivity
             const int maxRequestIds = 200;
 
-#ifdef USING_QTPIM
             QContactIdFilter filter;
-#else
-            QContactLocalIdFilter filter;
-#endif
             if (m_changedContacts.count() > maxRequestIds) {
                 filter.setIds(m_changedContacts.mid(0, maxRequestIds));
                 m_changedContacts = m_changedContacts.mid(maxRequestIds);
@@ -1774,11 +1675,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
         } else if (!m_displayOff) {
             const int maxRequestIds = 200;
 
-#ifdef USING_QTPIM
             QContactIdFilter filter;
-#else
-            QContactLocalIdFilter filter;
-#endif
             if (m_presenceChangedContacts.count() > maxRequestIds) {
                 filter.setIds(m_presenceChangedContacts.mid(0, maxRequestIds));
                 m_presenceChangedContacts = m_presenceChangedContacts.mid(maxRequestIds);
@@ -2506,19 +2403,11 @@ void SeasideCache::contactIdsAvailable()
 
 void SeasideCache::relationshipsAvailable()
 {
-#ifdef USING_QTPIM
     static const QString aggregatesRelationship = QContactRelationship::Aggregates();
-#else
-    static const QString aggregatesRelationship = QContactRelationship::Aggregates;
-#endif
 
     foreach (const QContactRelationship &rel, m_relationshipsFetchRequest.relationships()) {
         if (rel.relationshipType() == aggregatesRelationship) {
-#ifdef USING_QTPIM
             m_constituentIds.insert(apiId(rel.second()));
-#else
-            m_constituentIds.insert(rel.second().localId());
-#endif
         }
     }
 }
@@ -2636,11 +2525,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
                 m_contactsToLinkTo.append(aggregateId);
             } else {
                 // We didn't find any constituents - report the empty list
-#ifdef USING_QTPIM
                 CacheItem *cacheItem = itemById(aggregateId);
-#else
-                CacheItem *cacheItem = itemById(aggregateId.localId());
-#endif
                 if (cacheItem->itemData) {
                     cacheItem->itemData->constituentsFetched(QList<int>());
                 }
@@ -2652,11 +2537,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         if (!m_contactsToLinkTo.isEmpty()) {
             // Report these results
             QContactId aggregateId = m_contactsToLinkTo.takeFirst();
-#ifdef USING_QTPIM
             CacheItem *cacheItem = itemById(aggregateId);
-#else
-            CacheItem *cacheItem = itemById(aggregateId.localId());
-#endif
 
             QList<int> constituentIds;
             foreach (const ContactIdType &id, m_constituentIds) {
@@ -2692,11 +2573,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         } else if (!m_contactsToFetchCandidates.isEmpty()) {
             // Report these results
             QContactId contactId = m_contactsToFetchCandidates.takeFirst();
-#ifdef USING_QTPIM
             CacheItem *cacheItem = itemById(contactId);
-#else
-            CacheItem *cacheItem = itemById(contactId.localId());
-#endif
 
             const quint32 contactIid = internalId(contactId);
 
@@ -2728,11 +2605,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         }
 
         foreach (const QContactRelationship &relationship, relationships) {
-#ifdef USING_QTPIM
             m_aggregatedContacts.insert(SeasideCache::apiId(relationship.first()));
-#else
-            m_aggregatedContacts.insert(relationship.first().localId());
-#endif
         }
 
         if (completed) {
@@ -3058,15 +2931,11 @@ QString SeasideCache::exportContacts()
         return QString();
     }
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
     QString baseDir;
     foreach (const QString &loc, QStandardPaths::standardLocations(QStandardPaths::DocumentsLocation)) {
         baseDir = loc;
         break;
     }
-#else
-    const QString baseDir = QDesktopServices::storageLocation(QDesktopServices::DocumentsLocation);
-#endif
     QFile vcard(baseDir
               + QDir::separator()
               + QDateTime::currentDateTime().toString("ss_mm_hh_dd_mm_yyyy")
@@ -3295,13 +3164,8 @@ QContactRelationship SeasideCache::makeRelationship(const QString &type, const Q
 {
     QContactRelationship relationship;
     relationship.setRelationshipType(type);
-#ifdef USING_QTPIM
     relationship.setFirst(contact1);
     relationship.setSecond(contact2);
-#else
-    relationship.setFirst(contact1.id());
-    relationship.setSecond(contact2.id());
-#endif
     return relationship;
 }
 

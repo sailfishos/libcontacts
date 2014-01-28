@@ -16,24 +16,13 @@ QMAKE_PKGCONFIG_LIBDIR = $$PREFIX/lib
 QMAKE_PKGCONFIG_DESTDIR = pkgconfig
 
 CONFIG += link_pkgconfig
-equals(QT_MAJOR_VERSION, 4) {
-    packagesExist(mlite) {
-        PKGCONFIG += mlite
-        DEFINES += HAS_MLITE
-    } else {
-        warning("mlite not available. Some functionality may not work as expected.")
-    }
-    PKGCONFIG += mce
+packagesExist(mlite5) {
+    PKGCONFIG += mlite5
+    DEFINES += HAS_MLITE
+} else {
+    warning("mlite not available. Some functionality may not work as expected.")
 }
-equals(QT_MAJOR_VERSION, 5) {
-    packagesExist(mlite5) {
-        PKGCONFIG += mlite5
-        DEFINES += HAS_MLITE
-    } else {
-        warning("mlite not available. Some functionality may not work as expected.")
-    }
-    PKGCONFIG += mlocale5 mce
-}
+PKGCONFIG += mlocale5 mce
 
 DEFINES += CONTACTCACHE_BUILD
 
@@ -41,12 +30,7 @@ DEFINES += CONTACTCACHE_BUILD
 QT += contacts-private
 
 # We need the moc output for ContactManagerEngine from sqlite-extensions
-equals(QT_MAJOR_VERSION, 4) {
-    extensionsIncludePath = $$system(pkg-config --cflags-only-I qtcontacts-sqlite-extensions)
-}
-equals(QT_MAJOR_VERSION, 5) {
-    extensionsIncludePath = $$system(pkg-config --cflags-only-I qtcontacts-sqlite-qt5-extensions)
-}
+extensionsIncludePath = $$system(pkg-config --cflags-only-I qtcontacts-sqlite-qt5-extensions)
 VPATH += $$replace(extensionsIncludePath, -I, )
 HEADERS += contactmanagerengine.h
 

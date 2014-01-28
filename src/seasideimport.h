@@ -37,12 +37,8 @@
 #include <QContact>
 #include <QVersitDocument>
 
-#ifdef USING_QTPIM
 QTCONTACTS_USE_NAMESPACE
 QTVERSIT_USE_NAMESPACE
-#else
-QTM_USE_NAMESPACE
-#endif
 
 class CONTACTCACHE_EXPORT SeasideImport
 {

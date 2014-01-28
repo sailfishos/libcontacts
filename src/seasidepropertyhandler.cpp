@@ -32,10 +32,6 @@
 
 #include "seasidepropertyhandler.h"
 
-#ifndef QT_VERSION_5
-#include <QDesktopServices>
-#include <QContactThumbnail>
-#endif
 #include <QContactAvatar>
 #include <QContactOnlineAccount>
 #include <QContactPresence>
@@ -64,19 +60,6 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
 {
     // if the property is a PHOTO property, store the data to disk
     // and then create an avatar detail which points to it.
-
-#ifndef QT_VERSION_5
-    // The Qt4 / QtMobility version has QContactThumbnail support.
-    // We need to remove any such thumbnail detail from the output,
-    // as some backends (such as qtcontacts-sqlite) do not support
-    // that detail type.
-    for (int i = 0; i < updatedDetails->size(); ++i) {
-        if (updatedDetails->at(i).definitionName() == QContactThumbnail::DefinitionName) {
-            updatedDetails->removeAt(i);
-            --i;
-        }
-    }
-#endif
 
     // The data might be either a URL, a file path, or encoded image data
     // It's hard to tell what the content is, because versit removes the encoding
