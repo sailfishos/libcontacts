@@ -111,15 +111,15 @@ QMap<QString, QString> managerParameters()
 
 Q_GLOBAL_STATIC_WITH_ARGS(QContactManager, manager, (managerName(), managerParameters()))
 
-typedef QList<DetailTypeId> DetailList;
+typedef QList<QContactDetail::DetailType> DetailList;
 
 template<typename T>
-DetailTypeId detailType()
+QContactDetail::DetailType detailType()
 {
     return T::Type;
 }
 
-DetailTypeId detailType(const QContactDetail &detail)
+QContactDetail::DetailType detailType(const QContactDetail &detail)
 {
     return detail.type();
 }
@@ -335,12 +335,12 @@ bool ignoreContactForNameGroups(const QContact &contact)
     return (syncTarget.syncTarget() != aggregate);
 }
 
-QList<quint32> internalIds(const QList<SeasideCache::ContactIdType> &ids)
+QList<quint32> internalIds(const QList<QContactId> &ids)
 {
     QList<quint32> rv;
     rv.reserve(ids.count());
 
-    foreach (const SeasideCache::ContactIdType &id, ids) {
+    foreach (const QContactId &id, ids) {
         rv.append(SeasideCache::internalId(id));
     }
 
@@ -452,17 +452,17 @@ SeasideCache* SeasideCache::instance()
     return instancePtr;
 }
 
-SeasideCache::ContactIdType SeasideCache::apiId(const QContact &contact)
+QContactId SeasideCache::apiId(const QContact &contact)
 {
     return contact.id();
 }
 
-SeasideCache::ContactIdType SeasideCache::apiId(quint32 iid)
+QContactId SeasideCache::apiId(quint32 iid)
 {
     return QtContactsSqliteExtensions::apiContactId(iid);
 }
 
-bool SeasideCache::validId(const ContactIdType &id)
+bool SeasideCache::validId(const QContactId &id)
 {
     return !id.isNull();
 }
@@ -806,7 +806,7 @@ int SeasideCache::contactId(const QContact &contact)
     return static_cast<int>(internal);
 }
 
-SeasideCache::CacheItem *SeasideCache::itemById(const ContactIdType &id, bool requireComplete)
+SeasideCache::CacheItem *SeasideCache::itemById(const QContactId &id, bool requireComplete)
 {
     if (!validId(id))
         return 0;
@@ -845,7 +845,7 @@ SeasideCache::CacheItem *SeasideCache::itemById(int id, bool requireComplete)
     return 0;
 }
 
-SeasideCache::CacheItem *SeasideCache::existingItem(const ContactIdType &id)
+SeasideCache::CacheItem *SeasideCache::existingItem(const QContactId &id)
 {
     return existingItem(internalId(id));
 }
@@ -858,7 +858,7 @@ SeasideCache::CacheItem *SeasideCache::existingItem(quint32 iid)
             : 0;
 }
 
-QContact SeasideCache::contactById(const ContactIdType &id)
+QContact SeasideCache::contactById(const QContactId &id)
 {
     quint32 iid = internalId(id);
     return instancePtr->m_people.value(iid, CacheItem()).contact;
@@ -957,7 +957,7 @@ SeasideCache::CacheItem *SeasideCache::resolveOnlineAccount(ResolveListener *lis
     return item;
 }
 
-SeasideCache::ContactIdType SeasideCache::selfContactId()
+QContactId SeasideCache::selfContactId()
 {
     return manager()->selfContactId();
 }
@@ -972,7 +972,7 @@ void SeasideCache::requestUpdate()
 
 bool SeasideCache::saveContact(const QContact &contact)
 {
-    ContactIdType id = apiId(contact);
+    QContactId id = apiId(contact);
     if (validId(id)) {
         instancePtr->m_contactsToSave[id] = contact;
         instancePtr->contactDataChanged(internalId(id));
@@ -1005,7 +1005,7 @@ void SeasideCache::contactDataChanged(quint32 iid, FilterType filter)
 
 bool SeasideCache::removeContact(const QContact &contact)
 {
-    ContactIdType id = apiId(contact);
+    QContactId id = apiId(contact);
     if (!validId(id))
         return false;
 
@@ -1520,7 +1520,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
         } else {
             m_contactsToCreate.reserve(m_contactsToCreate.count() + m_contactsToSave.count());
 
-            typedef QHash<ContactIdType, QContact>::iterator iterator;
+            typedef QHash<QContactId, QContact>::iterator iterator;
             for (iterator it = m_contactsToSave.begin(); it != m_contactsToSave.end(); ++it) {
                 m_contactsToCreate.append(*it);
             }
@@ -1565,7 +1565,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
         if (m_contactIdRequest.isActive()) {
             requestPending = true;
         } else {
-            ContactIdType contactId(m_contactsToFetchCandidates.first());
+            QContactId contactId(m_contactsToFetchCandidates.first());
             const QContact contact(contactById(contactId));
 
             // Find candidates to merge with this contact
@@ -1768,7 +1768,7 @@ bool SeasideCache::event(QEvent *event)
         if (!m_expiredContacts.isEmpty()) {
             QList<quint32> removeIds;
 
-            QHash<ContactIdType, int>::const_iterator it = m_expiredContacts.constBegin(), end = m_expiredContacts.constEnd();
+            QHash<QContactId, int>::const_iterator it = m_expiredContacts.constBegin(), end = m_expiredContacts.constEnd();
             for ( ; it != end; ++it) {
                 if (it.value() < 0) {
                     quint32 iid = internalId(it.key());
@@ -1817,21 +1817,21 @@ void SeasideCache::timerEvent(QTimerEvent *event)
     }
 }
 
-void SeasideCache::contactsAdded(const QList<ContactIdType> &ids)
+void SeasideCache::contactsAdded(const QList<QContactId> &ids)
 {
     if (m_keepPopulated) {
         updateContacts(ids, &m_changedContacts);
     }
 }
 
-void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
+void SeasideCache::contactsChanged(const QList<QContactId> &ids)
 {
     if (m_keepPopulated) {
         updateContacts(ids, &m_changedContacts);
     } else {
         // Update these contacts if they're already in the cache
-        QList<ContactIdType> presentIds;
-        foreach (const ContactIdType &id, ids) {
+        QList<QContactId> presentIds;
+        foreach (const QContactId &id, ids) {
             if (existingItem(id)) {
                 presentIds.append(id);
             }
@@ -1840,14 +1840,14 @@ void SeasideCache::contactsChanged(const QList<ContactIdType> &ids)
     }
 }
 
-void SeasideCache::contactsPresenceChanged(const QList<ContactIdType> &ids)
+void SeasideCache::contactsPresenceChanged(const QList<QContactId> &ids)
 {
     if (m_keepPopulated) {
         updateContacts(ids, &m_presenceChangedContacts);
     } else {
         // Update these contacts if they're already in the cache
-        QList<ContactIdType> presentIds;
-        foreach (const ContactIdType &id, ids) {
+        QList<QContactId> presentIds;
+        foreach (const QContactId &id, ids) {
             if (existingItem(id)) {
                 presentIds.append(id);
             }
@@ -1856,11 +1856,11 @@ void SeasideCache::contactsPresenceChanged(const QList<ContactIdType> &ids)
     }
 }
 
-void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)
+void SeasideCache::contactsRemoved(const QList<QContactId> &ids)
 {
-    QList<ContactIdType> presentIds;
+    QList<QContactId> presentIds;
 
-    foreach (const ContactIdType &id, ids) {
+    foreach (const QContactId &id, ids) {
         if (CacheItem *item = existingItem(id)) {
             // Report this item is about to be removed
             foreach (ChangeListener *listener, m_changeListeners) {
@@ -1876,7 +1876,7 @@ void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)
             item->listeners = 0;
 
             // Remove the links to addressible details
-            updateContactIndexing(item->contact, QContact(), item->iid, QSet<DetailTypeId>(), item);
+            updateContactIndexing(item->contact, QContact(), item->iid, QSet<QContactDetail::DetailType>(), item);
 
             if (!m_keepPopulated) {
                 presentIds.append(id);
@@ -1888,7 +1888,7 @@ void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)
         m_refreshRequired = true;
     } else {
         // Remove these contacts if they're already in the cache; they won't be removed by syncing
-        foreach (const ContactIdType &id, presentIds) {
+        foreach (const QContactId &id, presentIds) {
             m_expiredContacts[id] += -1;
         }
     }
@@ -1898,7 +1898,7 @@ void SeasideCache::contactsRemoved(const QList<ContactIdType> &ids)
 
 void SeasideCache::updateContacts()
 {
-    QList<ContactIdType> contactIds;
+    QList<QContactId> contactIds;
 
     typedef QHash<quint32, CacheItem>::iterator iterator;
     for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
@@ -1932,7 +1932,7 @@ void SeasideCache::fetchContacts()
     }
 }
 
-void SeasideCache::updateContacts(const QList<ContactIdType> &contactIds, QList<ContactIdType> *updateList)
+void SeasideCache::updateContacts(const QList<QContactId> &contactIds, QList<QContactId> *updateList)
 {
     // Wait for new changes to be reported
     static const int PostponementIntervalMs = 500;
@@ -2036,7 +2036,7 @@ void SeasideCache::resolveUnknownAddresses(const QString &first, const QString &
     }
 }
 
-bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<DetailTypeId> &queryDetailTypes, CacheItem *item)
+bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<QContactDetail::DetailType> &queryDetailTypes, CacheItem *item)
 {
     bool modified = false;
 
@@ -2148,11 +2148,11 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
     return modified;
 }
 
-void updateDetailsFromCache(QContact &contact, SeasideCache::CacheItem *item, const QSet<DetailTypeId> &queryDetailTypes)
+void updateDetailsFromCache(QContact &contact, SeasideCache::CacheItem *item, const QSet<QContactDetail::DetailType> &queryDetailTypes)
 {
     // Copy any existing detail types that are in the current record to the new instance
     foreach (const QContactDetail &existing, item->contact.details()) {
-        const DetailTypeId existingType(detailType(existing));
+        const QContactDetail::DetailType existingType(detailType(existing));
 
         static const DetailList contactsTableTypes(contactsTableDetails());
 
@@ -2189,8 +2189,8 @@ void SeasideCache::contactsAvailable()
     if (contacts.isEmpty())
         return;
 
-    QSet<DetailTypeId> queryDetailTypes;
-    foreach (const DetailTypeId &typeId, detailTypesHint(fetchHint)) {
+    QSet<QContactDetail::DetailType> queryDetailTypes;
+    foreach (const QContactDetail::DetailType &typeId, detailTypesHint(fetchHint)) {
         queryDetailTypes.insert(typeId);
     }
     const bool partialFetch = !queryDetailTypes.isEmpty();
@@ -2200,7 +2200,7 @@ void SeasideCache::contactsAvailable()
         FilterType type(m_populateProgress == FetchFavorites ? FilterFavorites
                                                              : (m_populateProgress == FetchMetadata ? FilterAll
                                                                                                     : FilterOnline));
-        QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToAppend.find(type);
+        QHash<FilterType, QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator it = m_contactsToAppend.find(type);
         if (it != m_contactsToAppend.end()) {
             // All populate queries have the same detail types, so we can append this list to the existing one
             it.value().second.append(contacts);
@@ -2213,7 +2213,7 @@ void SeasideCache::contactsAvailable()
             applyContactUpdates(contacts, partialFetch, queryDetailTypes);
         } else {
             // Add these contacts to the list to be progressively appended
-            QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin(), end = m_contactsToUpdate.end();
+            QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin(), end = m_contactsToUpdate.end();
             for ( ; it != end; ++it) {
                 if ((*it).first == queryDetailTypes) {
                     (*it).second.append(contacts);
@@ -2233,7 +2233,7 @@ void SeasideCache::applyPendingContactUpdates()
 {
     if (!m_contactsToAppend.isEmpty()) {
         // Insert the contacts in the order they're requested
-        QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator end = m_contactsToAppend.end(), it = end;
+        QHash<FilterType, QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator end = m_contactsToAppend.end(), it = end;
         if ((it = m_contactsToAppend.find(FilterFavorites)) != end) {
         } else if ((it = m_contactsToAppend.find(FilterAll)) != end) {
         } else {
@@ -2242,7 +2242,7 @@ void SeasideCache::applyPendingContactUpdates()
         Q_ASSERT(it != end);
 
         FilterType type = it.key();
-        QSet<DetailTypeId> &detailTypes((*it).first);
+        QSet<QContactDetail::DetailType> &detailTypes((*it).first);
         const bool partialFetch = !detailTypes.isEmpty();
 
         QList<QContact> &appendedContacts((*it).second);
@@ -2277,9 +2277,9 @@ void SeasideCache::applyPendingContactUpdates()
             }
         }
     } else {
-        QList<QPair<QSet<DetailTypeId>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
+        QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
 
-        QSet<DetailTypeId> &detailTypes((*it).first);
+        QSet<QContactDetail::DetailType> &detailTypes((*it).first);
         const bool partialFetch = !detailTypes.isEmpty();
 
         // Update a single contact at a time; the update can cause numerous QML bindings
@@ -2293,7 +2293,7 @@ void SeasideCache::applyPendingContactUpdates()
     }
 }
 
-void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes)
+void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<QContactDetail::DetailType> &queryDetailTypes)
 {
     QSet<QString> modifiedGroups;
 
@@ -2390,7 +2390,7 @@ void SeasideCache::notifyNameGroupsChanged(const QSet<QString> &groups)
 void SeasideCache::contactIdsAvailable()
 {
     if (!m_contactsToFetchCandidates.isEmpty()) {
-        foreach (const ContactIdType &id, m_contactIdRequest.ids()) {
+        foreach (const QContactId &id, m_contactIdRequest.ids()) {
             m_candidateIds.insert(id);
         }
         return;
@@ -2450,7 +2450,7 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
             continue;
 
         if (filter == FilterAll) {
-            const ContactIdType apiId = SeasideCache::apiId(iid);
+            const QContactId apiId = SeasideCache::apiId(iid);
             m_expiredContacts[apiId] += 1;
         }
 
@@ -2463,7 +2463,7 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
     return end - index + 1;
 }
 
-void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes)
+void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<QContactDetail::DetailType> &queryDetailTypes)
 {
     if (!contacts.isEmpty()) {
         QList<quint32> &cacheIds = m_contacts[filterType];
@@ -2540,7 +2540,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             CacheItem *cacheItem = itemById(aggregateId);
 
             QList<int> constituentIds;
-            foreach (const ContactIdType &id, m_constituentIds) {
+            foreach (const QContactId &id, m_constituentIds) {
                 constituentIds.append(internalId(id));
             }
             m_constituentIds.clear();
@@ -2578,7 +2578,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             const quint32 contactIid = internalId(contactId);
 
             QList<int> candidateIds;
-            foreach (const ContactIdType &id, m_candidateIds) {
+            foreach (const QContactId &id, m_candidateIds) {
                 // Exclude the original source contact
                 const quint32 iid = internalId(id);
                 if (iid != contactIid) {
@@ -2609,14 +2609,14 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
         }
 
         if (completed) {
-            foreach (const ContactIdType &contactId, m_aggregatedContacts) {
+            foreach (const QContactId &contactId, m_aggregatedContacts) {
                 CacheItem *cacheItem = itemById(contactId);
                 if (cacheItem && cacheItem->itemData)
                     cacheItem->itemData->aggregationOperationCompleted();
             }
 
             // We need to update these modified contacts immediately
-            foreach (const ContactIdType &id, m_aggregatedContacts)
+            foreach (const QContactId &id, m_aggregatedContacts)
                 m_changedContacts.append(id);
             fetchContacts();
 
@@ -2905,7 +2905,7 @@ QString SeasideCache::exportContacts()
     QList<QContact> contacts;
     contacts.reserve(instancePtr->m_people.count());
 
-    QList<ContactIdType> contactsToFetch;
+    QList<QContactId> contactsToFetch;
     contactsToFetch.reserve(instancePtr->m_people.count());
 
     const quint32 selfId = internalId(manager()->selfContactId());
@@ -3020,7 +3020,7 @@ void SeasideCache::disaggregateContacts(const QContact &contact1, const QContact
     instancePtr->requestUpdate();
 }
 
-void SeasideCache::updateConstituentAggregations(const ContactIdType &contactId)
+void SeasideCache::updateConstituentAggregations(const QContactId &contactId)
 {
     typedef QList<QPair<ContactLinkRequest, ContactLinkRequest> >::iterator iterator;
     for (iterator it = m_contactPairsToLink.begin(); it != m_contactPairsToLink.end(); ) {
@@ -3039,7 +3039,7 @@ void SeasideCache::updateConstituentAggregations(const ContactIdType &contactId)
 }
 
 // Called once constituents have been fetched for both persons.
-void SeasideCache::completeContactAggregation(const ContactIdType &contact1Id, const ContactIdType &contact2Id)
+void SeasideCache::completeContactAggregation(const QContactId &contact1Id, const QContactId &contact2Id)
 {
     CacheItem *cacheItem1 = itemById(contact1Id);
     CacheItem *cacheItem2 = itemById(contact2Id);
