@@ -42,7 +42,7 @@ Requires:   %{name} = %{version}-%{release}
 
 %qmake5 
 
-make %{?jobs:-j%jobs}
+make %{?_smp_mflags}
 
 %install
 rm -rf %{buildroot}
