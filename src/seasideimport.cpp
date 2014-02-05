@@ -311,10 +311,25 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     QHash<QString, int> importNames;
     QHash<QString, int> importLabels;
 
+    QSet<QContactDetail::DetailType> unimportableDetailTypes;
+    unimportableDetailTypes.insert(QContactDetail::TypeFamily);
+    unimportableDetailTypes.insert(QContactDetail::TypeGeoLocation);
+    unimportableDetailTypes.insert(QContactDetail::TypeGlobalPresence);
+    unimportableDetailTypes.insert(QContactDetail::TypeSyncTarget);
+    unimportableDetailTypes.insert(QContactDetail::TypeVersion);
+
     // Merge any duplicates in the import list
     QList<QContact>::iterator it = importedContacts.begin();
     while (it != importedContacts.end()) {
         QContact &contact(*it);
+
+        // Remove any details that our backend can't store
+        foreach (QContactDetail detail, contact.details()) {
+            if (unimportableDetailTypes.contains(detail.type())) {
+                qDebug() << "  Removing unimportable detail:" << detail;
+                contact.removeDetail(&detail);
+            }
+        }
 
         const QString guid = contact.detail<QContactGuid>().guid();
         const QString name = contactNameString(contact);
