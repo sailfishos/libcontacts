@@ -57,12 +57,8 @@
 #include <QContactTag>
 #include <QContactUrl>
 
-#ifdef USING_QTPIM
 #include <QContactIdFilter>
 #include <QContactExtendedDetail>
-#else
-#include <QContactLocalIdFilter>
-#endif
 
 #include <QVersitContactExporter>
 #include <QVersitContactImporter>
@@ -89,13 +85,8 @@ QContactFilter localContactFilter()
 {
     // Contacts that are local to the device have sync target 'local' or 'was_local'
     QContactDetailFilter filterLocal, filterWasLocal;
-#ifdef USING_QTPIM
     filterLocal.setDetailType(QContactSyncTarget::Type, QContactSyncTarget::FieldSyncTarget);
     filterWasLocal.setDetailType(QContactSyncTarget::Type, QContactSyncTarget::FieldSyncTarget);
-#else
-    filterLocal.setDetailDefinitionName(QContactSyncTarget::DefinitionName, QContactSyncTarget::FieldSyncTarget);
-    filterWasLocal.setDetailDefinitionName(QContactSyncTarget::DefinitionName, QContactSyncTarget::FieldSyncTarget);
-#endif
     filterLocal.setValue(QString::fromLatin1("local"));
     filterWasLocal.setValue(QString::fromLatin1("was_local"));
 
@@ -133,32 +124,19 @@ QString contactNameString(const QContact &contact)
 template<typename T, typename F>
 QVariant detailValue(const T &detail, F field)
 {
-#ifdef USING_QTPIM
     return detail.value(field);
-#else
-    return detail.variantValue(field);
-#endif
 }
 
-#ifdef USING_QTPIM
 typedef QMap<int, QVariant> DetailMap;
-#else
-typedef QVariantMap DetailMap;
-#endif
 
 DetailMap detailValues(const QContactDetail &detail)
 {
-#ifdef USING_QTPIM
     DetailMap rv(detail.values());
-#else
-    DetailMap rv(detail.variantValues());
-#endif
     return rv;
 }
 
 static bool variantEqual(const QVariant &lhs, const QVariant &rhs)
 {
-#ifdef USING_QTPIM
     // Work around incorrect result from QVariant::operator== when variants contain QList<int>
     static const int QListIntType = QMetaType::type("QList<int>");
 
@@ -170,7 +148,6 @@ static bool variantEqual(const QVariant &lhs, const QVariant &rhs)
     if (lhsType == QListIntType) {
         return (lhs.value<QList<int> >() == rhs.value<QList<int> >());
     }
-#endif
     return (lhs == rhs);
 }
 
@@ -197,7 +174,6 @@ static void fixupDetail(QContactDetail &)
 {
 }
 
-#ifdef USING_QTPIM
 // Fixup QContactUrl because importer produces incorrectly typed URL field
 static void fixupDetail(QContactUrl &url)
 {
@@ -236,7 +212,6 @@ static void fixupDetail(QContactOrganization &org)
         }
     }
 }
-#endif
 
 template<typename T>
 bool updateExistingDetails(QContact *updateContact, const QContact &importedContact, bool singular = false)
@@ -288,9 +263,7 @@ bool mergeIntoExistingContact(QContact *updateContact, const QContact &importedC
     rv |= updateExistingDetails<QContactRingtone>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactTag>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactUrl>(updateContact, importedContact);
-#ifdef USING_QTPIM
     rv |= updateExistingDetails<QContactExtendedDetail>(updateContact, importedContact);
-#endif
 
     return rv;
 }
@@ -419,11 +392,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
     // Find all names and GUIDs for local contacts that might match these contacts
     QContactFetchHint fetchHint(basicFetchHint());
-#ifdef USING_QTPIM
     fetchHint.setDetailTypesHint(QList<QContactDetail::DetailType>() << QContactName::Type << QContactNickname::Type << QContactGuid::Type);
-#else
-    fetchHint.setDetailDefinitionsHint(QStringList() << QContactName::DefinitionName << QContactNickname::DefinitionName << QContactGuid::DefinitionName);
-#endif
 
     QHash<QString, QContactId> existingGuids;
     QHash<QString, QContactId> existingNames;
@@ -519,16 +488,8 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     int existingCount(existingIds.count());
     if (existingCount > 0) {
         // Retrieve all the contacts that we have matches for
-#ifdef USING_QTPIM
         QContactIdFilter idFilter;
         idFilter.setIds(existingIds.keys());
-#else
-        QContactLocalIdFilter idFilter;
-        QList<QContactLocalId> localIds;
-        foreach (const QContactId &id, existingIds.keys()) {
-            localids.append(id.toLocal());
-        }
-#endif
 
         QSet<QContactId> modifiedContacts;
         QSet<QContactId> unmodifiedContacts;

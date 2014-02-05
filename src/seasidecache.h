@@ -47,13 +47,8 @@
 #include <QContactRelationshipFetchRequest>
 #include <QContactRelationshipSaveRequest>
 #include <QContactRelationshipRemoveRequest>
-#ifdef USING_QTPIM
 #include <QContactIdFilter>
 #include <QContactIdFetchRequest>
-#else
-#include <QContactLocalIdFilter>
-#include <QContactLocalIdFetchRequest>
-#endif
 
 #include <QBasicTimer>
 #include <QSet>
@@ -65,15 +60,7 @@
 #include <mgconfitem.h>
 #endif
 
-#ifdef USING_QTPIM
 QTCONTACTS_USE_NAMESPACE
-
-typedef QContactDetail::DetailType DetailTypeId;
-#else
-QTM_USE_NAMESPACE
-
-typedef QString DetailTypeId;
-#endif
 
 class CONTACTCACHE_EXPORT SeasideNameGroupChangeListener
 {
@@ -88,8 +75,6 @@ class CONTACTCACHE_EXPORT SeasideCache : public QObject
 {
     Q_OBJECT
 public:
-    typedef QtContactsSqliteExtensions::ApiContactIdType ContactIdType;
-
     enum FilterType {
         FilterNone,
         FilterAll,
@@ -162,7 +147,7 @@ public:
             : contact(contact), itemData(0), iid(internalId(contact)),
               statusFlags(contact.detail<QContactStatusFlags>().flagsValue()), contactState(ContactAbsent), listeners(0) {}
 
-        ContactIdType apiId() const { return SeasideCache::apiId(contact); }
+        QContactId apiId() const { return SeasideCache::apiId(contact); }
 
         ItemListener *appendListener(ItemListener *listener, void *key)
         {
@@ -221,10 +206,10 @@ public:
 
     struct ContactLinkRequest
     {
-        ContactLinkRequest(const SeasideCache::ContactIdType &id) : contactId(id), constituentsFetched(false) {}
+        ContactLinkRequest(const QContactId &id) : contactId(id), constituentsFetched(false) {}
         ContactLinkRequest(const ContactLinkRequest &req) : contactId(req.contactId), constituentsFetched(req.constituentsFetched) {}
 
-        SeasideCache::ContactIdType contactId;
+        QContactId contactId;
         bool constituentsFetched;
     };
 
@@ -268,19 +253,13 @@ public:
     static SeasideCache *instance();
     static QContactManager *manager();
 
-    static ContactIdType apiId(const QContact &contact);
-    static ContactIdType apiId(quint32 iid);
+    static QContactId apiId(const QContact &contact);
+    static QContactId apiId(quint32 iid);
 
-    static bool validId(const ContactIdType &id);
-#ifndef USING_QTPIM
     static bool validId(const QContactId &id);
-#endif
 
     static quint32 internalId(const QContact &contact);
     static quint32 internalId(const QContactId &id);
-#ifndef USING_QTPIM
-    static quint32 internalId(QContactLocalId id);
-#endif
 
     static void registerModel(ListModel *model, FilterType type, FetchDataType requiredTypes = FetchNone, FetchDataType extraTypes = FetchNone);
     static void unregisterModel(ListModel *model);
@@ -304,16 +283,12 @@ public:
 
     static int contactId(const QContact &contact);
 
-    static CacheItem *existingItem(const ContactIdType &id);
-#ifdef USING_QTPIM
+    static CacheItem *existingItem(const QContactId &id);
     static CacheItem *existingItem(quint32 iid);
-#endif
-    static CacheItem *itemById(const ContactIdType &id, bool requireComplete = true);
-#ifdef USING_QTPIM
+    static CacheItem *itemById(const QContactId &id, bool requireComplete = true);
     static CacheItem *itemById(int id, bool requireComplete = true);
-#endif
-    static ContactIdType selfContactId();
-    static QContact contactById(const ContactIdType &id);
+    static QContactId selfContactId();
+    static QContact contactById(const QContactId &id);
 
     static void ensureCompletion(CacheItem *cacheItem);
     static void refreshContact(CacheItem *cacheItem);
@@ -371,17 +346,10 @@ private slots:
     void relationshipsAvailable();
     void requestStateChanged(QContactAbstractRequest::State state);
     void updateContacts();
-#ifdef USING_QTPIM
     void contactsAdded(const QList<QContactId> &contactIds);
     void contactsChanged(const QList<QContactId> &contactIds);
     void contactsPresenceChanged(const QList<QContactId> &contactIds);
     void contactsRemoved(const QList<QContactId> &contactIds);
-#else
-    void contactsAdded(const QList<QContactLocalId> &contactIds);
-    void contactsChanged(const QList<QContactLocalId> &contactIds);
-    void contactsPresenceChanged(const QList<QContactLocalId> &contactIds);
-    void contactsRemoved(const QList<QContactLocalId> &contactIds);
-#endif
     void displayLabelOrderChanged();
     void sortPropertyChanged();
     void groupPropertyChanged();
@@ -404,14 +372,14 @@ private:
     void keepPopulated(quint32 requiredTypes, quint32 extraTypes);
 
     void requestUpdate();
-    void appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
+    void appendContacts(const QList<QContact> &contacts, FilterType filterType, bool partialFetch, const QSet<QContactDetail::DetailType> &queryDetailTypes);
     void fetchContacts();
-    void updateContacts(const QList<ContactIdType> &contactIds, QList<ContactIdType> *updateList);
+    void updateContacts(const QList<QContactId> &contactIds, QList<QContactId> *updateList);
     void applyPendingContactUpdates();
-    void applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<DetailTypeId> &queryDetailTypes);
+    void applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<QContactDetail::DetailType> &queryDetailTypes);
 
     void resolveUnknownAddresses(const QString &first, const QString &second, CacheItem *item);
-    bool updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<DetailTypeId> &queryDetailTypes, CacheItem *item);
+    bool updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<QContactDetail::DetailType> &queryDetailTypes, CacheItem *item);
     void updateCache(CacheItem *item, const QContact &contact, bool partialFetch, bool initialInsert);
     void reportItemUpdated(CacheItem *item);
 
@@ -427,8 +395,8 @@ private:
     void removeFromContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);
     void notifyNameGroupsChanged(const QSet<QString> &groups);
 
-    void updateConstituentAggregations(const ContactIdType &contactId);
-    void completeContactAggregation(const ContactIdType &contact1Id, const ContactIdType &contact2Id);
+    void updateConstituentAggregations(const QContactId &contactId);
+    void completeContactAggregation(const QContactId &contact1Id, const QContactId &contact2Id);
 
     void resolveAddress(ResolveListener *listener, const QString &first, const QString &second, bool requireComplete);
 
@@ -446,15 +414,15 @@ private:
     QMultiHash<QString, quint32> m_phoneNumberIds;
     QHash<QString, quint32> m_emailAddressIds;
     QHash<QPair<QString, QString>, quint32> m_onlineAccountIds;
-    QHash<ContactIdType, QContact> m_contactsToSave;
+    QHash<QContactId, QContact> m_contactsToSave;
     QHash<QString, QSet<quint32> > m_contactNameGroups;
     QList<QContact> m_contactsToCreate;
-    QHash<FilterType, QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToAppend;
-    QList<QPair<QSet<DetailTypeId>, QList<QContact> > > m_contactsToUpdate;
-    QList<ContactIdType> m_contactsToRemove;
-    QList<ContactIdType> m_changedContacts;
-    QList<ContactIdType> m_presenceChangedContacts;
-    QSet<ContactIdType> m_aggregatedContacts;
+    QHash<FilterType, QPair<QSet<QContactDetail::DetailType>, QList<QContact> > > m_contactsToAppend;
+    QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > > m_contactsToUpdate;
+    QList<QContactId> m_contactsToRemove;
+    QList<QContactId> m_changedContacts;
+    QList<QContactId> m_presenceChangedContacts;
+    QSet<QContactId> m_aggregatedContacts;
     QList<QContactId> m_contactsToFetchConstituents;
     QList<QContactId> m_contactsToFetchCandidates;
     QList<QContactId> m_contactsToLinkTo;
@@ -466,14 +434,10 @@ private:
     QList<ChangeListener*> m_changeListeners;
     QList<ListModel *> m_models[FilterTypesCount];
     QSet<QObject *> m_users;
-    QHash<ContactIdType,int> m_expiredContacts;
+    QHash<QContactId,int> m_expiredContacts;
     QContactFetchRequest m_fetchRequest;
     QContactFetchByIdRequest m_fetchByIdRequest;
-#ifdef USING_QTPIM
     QContactIdFetchRequest m_contactIdRequest;
-#else
-    QContactLocalIdFetchRequest m_contactIdRequest;
-#endif
     QContactRelationshipFetchRequest m_relationshipsFetchRequest;
     QContactRemoveRequest m_removeRequest;
     QContactSaveRequest m_saveRequest;
@@ -504,8 +468,8 @@ private:
     bool m_refreshRequired;
     bool m_contactsUpdated;
     bool m_displayOff;
-    QSet<ContactIdType> m_constituentIds;
-    QSet<ContactIdType> m_candidateIds;
+    QSet<QContactId> m_constituentIds;
+    QSet<QContactId> m_candidateIds;
 
     struct ResolveData {
         QString first;

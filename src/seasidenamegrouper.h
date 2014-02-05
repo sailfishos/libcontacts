@@ -37,11 +37,7 @@
 #include <QList>
 #include <QContact>
 
-#ifdef USING_QTPIM
 QTCONTACTS_USE_NAMESPACE
-#else
-QTM_USE_NAMESPACE
-#endif
 
 class CONTACTCACHE_EXPORT SeasideNameGrouper
 {

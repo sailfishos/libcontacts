@@ -41,9 +41,7 @@
 #include <QObject>
 #include <QtTest>
 
-#ifdef USING_QTPIM
 QTVERSIT_USE_NAMESPACE
-#endif
 
 class tst_SeasideImport : public QObject
 {
