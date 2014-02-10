@@ -1241,22 +1241,23 @@ QUrl SeasideCache::filteredAvatarUrl(const QContact &contact, const QStringList 
     return QUrl();
 }
 
-QString SeasideCache::normalizePhoneNumber(const QString &input)
+QString SeasideCache::normalizePhoneNumber(const QString &input, bool validate)
 {
-    const QtContactsSqliteExtensions::NormalizePhoneNumberFlags normalizeFlags(QtContactsSqliteExtensions::KeepPhoneNumberDialString |
-                                                                               QtContactsSqliteExtensions::ValidatePhoneNumber);
+    QtContactsSqliteExtensions::NormalizePhoneNumberFlags normalizeFlags(QtContactsSqliteExtensions::KeepPhoneNumberDialString);
+    if (validate) {
+        // If the number if not valid, return empty
+        normalizeFlags |= QtContactsSqliteExtensions::ValidatePhoneNumber;
+    }
 
-    // If the number if not valid, return null
     return QtContactsSqliteExtensions::normalizePhoneNumber(input, normalizeFlags);
 }
 
-QString SeasideCache::minimizePhoneNumber(const QString &input)
+QString SeasideCache::minimizePhoneNumber(const QString &input, bool validate)
 {
     // TODO: use a configuration variable to make this configurable
     const int maxCharacters = QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters;
 
-    // If the number if not valid, return null
-    QString validated(normalizePhoneNumber(input));
+    QString validated(normalizePhoneNumber(input, validate));
     if (validated.isNull())
         return validated;
 
