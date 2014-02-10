@@ -326,8 +326,8 @@ public:
     static QString generateDisplayLabelFromNonNameDetails(const QContact &contact);
     static QUrl filteredAvatarUrl(const QContact &contact, const QStringList &metadataFragments = QStringList());
 
-    static QString normalizePhoneNumber(const QString &input);
-    static QString minimizePhoneNumber(const QString &input);
+    static QString normalizePhoneNumber(const QString &input, bool validate = false);
+    static QString minimizePhoneNumber(const QString &input, bool validate = false);
 
     bool event(QEvent *event);
 
