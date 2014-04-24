@@ -313,12 +313,12 @@ StringPair addressPair(const QContactEmailAddress &emailAddress)
 StringPair addressPair(const QContactOnlineAccount &account)
 {
     StringPair address = qMakePair(account.value<QString>(QContactOnlineAccount__FieldAccountPath), account.accountUri().toLower());
-    return !address.first.isNull() && !address.second.isNull() ? address : StringPair();
+    return !address.first.isEmpty() && !address.second.isEmpty() ? address : StringPair();
 }
 
 bool validAddressPair(const StringPair &address)
 {
-    return (!address.first.isNull() || !address.second.isNull());
+    return (!address.first.isEmpty() || !address.second.isEmpty());
 }
 
 bool ignoreContactForNameGroups(const QContact &contact)
@@ -1264,7 +1264,7 @@ QString SeasideCache::minimizePhoneNumber(const QString &input, bool validate)
     const int maxCharacters = QtContactsSqliteExtensions::DefaultMaximumPhoneNumberCharacters;
 
     QString validated(normalizePhoneNumber(input, validate));
-    if (validated.isNull())
+    if (validated.isEmpty())
         return validated;
 
     return QtContactsSqliteExtensions::minimizePhoneNumber(validated, maxCharacters);
@@ -2358,7 +2358,7 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, bool par
 
 void SeasideCache::addToContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
 {
-    if (!group.isNull()) {
+    if (!group.isEmpty()) {
         QSet<quint32> &set(m_contactNameGroups[group]);
         if (!set.contains(iid)) {
             set.insert(iid);
@@ -2371,7 +2371,7 @@ void SeasideCache::addToContactNameGroup(quint32 iid, const QString &group, QSet
 
 void SeasideCache::removeFromContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
 {
-    if (!group.isNull()) {
+    if (!group.isEmpty()) {
         QSet<quint32> &set(m_contactNameGroups[group]);
         if (set.remove(iid)) {
             if (modifiedGroups && !m_nameGroupChangeListeners.isEmpty()) {
