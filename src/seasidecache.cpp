@@ -1085,6 +1085,15 @@ bool SeasideCache::isPopulated(FilterType filterType)
     return instancePtr->m_populated & (1 << filterType);
 }
 
+static bool needsSpaceBetweenNames(const QString &first, const QString &second)
+{
+    if (first.isEmpty() || second.isEmpty()) {
+        return false;
+    }
+    return first[first.length()-1].script() != QChar::Script_Han
+            || second[0].script() != QChar::Script_Han;
+}
+
 // small helper to avoid inconvenience
 QString SeasideCache::generateDisplayLabel(const QContact &contact, DisplayLabelOrder order)
 {
@@ -1106,8 +1115,9 @@ QString SeasideCache::generateDisplayLabel(const QContact &contact, DisplayLabel
         displayLabel.append(nameStr1);
 
     if (!nameStr2.isEmpty()) {
-        if (!displayLabel.isEmpty())
+        if (needsSpaceBetweenNames(nameStr1, nameStr2)) {
             displayLabel.append(" ");
+        }
         displayLabel.append(nameStr2);
     }
 
