@@ -35,11 +35,13 @@ VPATH += $$replace(extensionsIncludePath, -I, )
 HEADERS += contactmanagerengine.h
 
 SOURCES += \
+    $$PWD/cacheconfiguration.cpp \
     $$PWD/seasidecache.cpp \
     $$PWD/seasideimport.cpp \
     $$PWD/seasidepropertyhandler.cpp
 
 HEADERS += \
+    $$PWD/cacheconfiguration.h \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
     $$PWD/seasideimport.h \
@@ -48,6 +50,7 @@ HEADERS += \
     $$PWD/seasidepropertyhandler.h
 
 headers.files = \
+    $$PWD/cacheconfiguration.h \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
     $$PWD/seasideimport.h \
