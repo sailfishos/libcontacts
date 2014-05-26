@@ -33,6 +33,7 @@
 #define SEASIDECACHE_H
 
 #include "contactcacheexport.h"
+#include "cacheconfiguration.h"
 #include "seasidenamegrouper.h"
 
 #include <qtcontacts-extensions.h>
@@ -55,10 +56,6 @@
 
 #include <QElapsedTimer>
 #include <QAbstractListModel>
-
-#ifdef HAS_MLITE
-#include <mgconfitem.h>
-#endif
 
 QTCONTACTS_USE_NAMESPACE
 
@@ -96,8 +93,8 @@ public:
     };
 
     enum DisplayLabelOrder {
-        FirstNameFirst = 0,
-        LastNameFirst
+        FirstNameFirst = CacheConfiguration::FirstNameFirst,
+        LastNameFirst = CacheConfiguration::LastNameFirst
     };
 
     enum ContactState {
@@ -350,9 +347,9 @@ private slots:
     void contactsChanged(const QList<QContactId> &contactIds);
     void contactsPresenceChanged(const QList<QContactId> &contactIds);
     void contactsRemoved(const QList<QContactId> &contactIds);
-    void displayLabelOrderChanged();
-    void sortPropertyChanged();
-    void groupPropertyChanged();
+    void displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder order);
+    void sortPropertyChanged(const QString &sortProperty);
+    void groupPropertyChanged(const QString &groupProperty);
     void displayStatusChanged(const QString &);
 
 private:
@@ -446,11 +443,6 @@ private:
     QList<QContactSortOrder> m_sortOrder;
     QList<QContactSortOrder> m_onlineSortOrder;
     FilterType m_syncFilter;
-#ifdef HAS_MLITE
-    MGConfItem m_displayLabelOrderConf;
-    MGConfItem m_sortPropertyConf;
-    MGConfItem m_groupPropertyConf;
-#endif
     int m_populated;
     int m_cacheIndex;
     int m_queryIndex;
