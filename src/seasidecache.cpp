@@ -77,6 +77,8 @@ QTVERSIT_USE_NAMESPACE
 
 namespace {
 
+Q_GLOBAL_STATIC(CacheConfiguration, cacheConfig)
+
 ML10N::MLocale mLocale;
 
 const QString aggregateRelationshipType = QContactRelationship::Aggregates();
@@ -479,19 +481,11 @@ quint32 SeasideCache::internalId(const QContactId &id)
 
 SeasideCache::SeasideCache()
     : m_syncFilter(FilterNone)
-#ifdef HAS_MLITE
-    , m_displayLabelOrderConf(QLatin1String("/org/nemomobile/contacts/display_label_order"))
-    , m_sortPropertyConf(QLatin1String("/org/nemomobile/contacts/sort_property"))
-    , m_groupPropertyConf(QLatin1String("/org/nemomobile/contacts/group_property"))
-#endif
     , m_populated(0)
     , m_cacheIndex(0)
     , m_queryIndex(0)
     , m_fetchProcessedCount(0)
     , m_fetchByIdProcessedCount(0)
-    , m_displayLabelOrder(FirstNameFirst)
-    , m_sortProperty(QString::fromLatin1("firstName"))
-    , m_groupProperty(QString::fromLatin1("firstName"))
     , m_keepPopulated(false)
     , m_populateProgress(Unpopulated)
     , m_fetchTypes(0)
@@ -509,22 +503,11 @@ SeasideCache::SeasideCache()
     m_timer.start();
     m_fetchPostponed.invalidate();
 
-#ifdef HAS_MLITE
-    connect(&m_displayLabelOrderConf, SIGNAL(valueChanged()), this, SLOT(displayLabelOrderChanged()));
-    QVariant displayLabelOrder = m_displayLabelOrderConf.value();
-    if (displayLabelOrder.isValid())
-        m_displayLabelOrder = static_cast<DisplayLabelOrder>(displayLabelOrder.toInt());
-
-    connect(&m_sortPropertyConf, SIGNAL(valueChanged()), this, SLOT(sortPropertyChanged()));
-    QVariant sortPropertyConf = m_sortPropertyConf.value();
-    if (sortPropertyConf.isValid())
-        m_sortProperty = sortPropertyConf.toString();
-
-    connect(&m_groupPropertyConf, SIGNAL(valueChanged()), this, SLOT(groupPropertyChanged()));
-    QVariant groupPropertyConf = m_groupPropertyConf.value();
-    if (groupPropertyConf.isValid())
-        m_groupProperty = groupPropertyConf.toString();
-#endif
+    CacheConfiguration *config(cacheConfig());
+    connect(config, SIGNAL(displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder)),
+            this, SLOT(displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder)));
+    connect(config, SIGNAL(sortPropertyChanged(QString)), this, SLOT(sortPropertyChanged(QString)));
+    connect(config, SIGNAL(groupPropertyChanged(QString)), this, SLOT(groupPropertyChanged(QString)));
 
     if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
                                               MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
@@ -579,7 +562,7 @@ SeasideCache::SeasideCache()
     m_relationshipSaveRequest.setManager(mgr);
     m_relationshipRemoveRequest.setManager(mgr);
 
-    setSortOrder(m_sortProperty);
+    setSortOrder(sortProperty());
 }
 
 SeasideCache::~SeasideCache()
@@ -728,14 +711,14 @@ QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
         return QString();
 
     if (!instancePtr->m_nameGrouper.isNull()) {
-        QString group = instancePtr->m_nameGrouper->nameGroupForContact(cacheItem->contact, instancePtr->m_groupProperty);
+        QString group = instancePtr->m_nameGrouper->nameGroupForContact(cacheItem->contact, groupProperty());
         if (!group.isNull() && allContactNameGroups.contains(group)) {
             return group;
         }
     }
 
     const QContactName name(cacheItem->contact.detail<QContactName>());
-    const QString nameProperty(instancePtr->m_groupProperty == QString::fromLatin1("firstName") ? name.firstName() : name.lastName());
+    const QString nameProperty(groupProperty() == QString::fromLatin1("firstName") ? name.firstName() : name.lastName());
 
     QString group;
     if (!nameProperty.isEmpty()) {
@@ -787,17 +770,17 @@ QHash<QString, QSet<quint32> > SeasideCache::nameGroupMembers()
 
 SeasideCache::DisplayLabelOrder SeasideCache::displayLabelOrder()
 {
-    return instancePtr->m_displayLabelOrder;
+    return static_cast<DisplayLabelOrder>(cacheConfig()->displayLabelOrder());
 }
 
 QString SeasideCache::sortProperty()
 {
-    return instancePtr->m_sortProperty;
+    return cacheConfig()->sortProperty();
 }
 
 QString SeasideCache::groupProperty()
 {
-    return instancePtr->m_groupProperty;
+    return cacheConfig()->groupProperty();
 }
 
 int SeasideCache::contactId(const QContact &contact)
@@ -1998,7 +1981,7 @@ void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool pa
         item->contact = contact;
     }
 
-    item->displayLabel = generateDisplayLabel(item->contact, m_displayLabelOrder);
+    item->displayLabel = generateDisplayLabel(item->contact, displayLabelOrder());
     item->nameGroup = determineNameGroup(item);
 
     if (!initialInsert) {
@@ -2752,130 +2735,96 @@ void SeasideCache::setSortOrder(const QString &property)
     m_onlineSortOrder.prepend(onlineOrder);
 }
 
-void SeasideCache::displayLabelOrderChanged()
+void SeasideCache::displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder order)
 {
-#ifdef HAS_MLITE
-    QVariant displayLabelOrder = m_displayLabelOrderConf.value();
-    if (displayLabelOrder.isValid() && displayLabelOrder.toInt() != m_displayLabelOrder) {
-        m_displayLabelOrder = static_cast<DisplayLabelOrder>(displayLabelOrder.toInt());
+    QSet<QString> modifiedGroups;
 
-        QSet<QString> modifiedGroups;
+    // Update the display labels
+    typedef QHash<quint32, CacheItem>::iterator iterator;
+    for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
+        // Regenerate the display label
+        QString newLabel = generateDisplayLabel(it->contact, static_cast<DisplayLabelOrder>(order));
+        if (newLabel != it->displayLabel) {
+            it->displayLabel = newLabel;
 
-        // Update the display labels
-        typedef QHash<quint32, CacheItem>::iterator iterator;
-        for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
-            // Regenerate the display label
-            QString newLabel = generateDisplayLabel(it->contact, m_displayLabelOrder);
-            if (newLabel != it->displayLabel) {
-                it->displayLabel = newLabel;
-
-                contactDataChanged(it->iid);
-                reportItemUpdated(&*it);
-            }
-
-            if (it->itemData) {
-                it->itemData->displayLabelOrderChanged(m_displayLabelOrder);
-            }
-
-            // If the contact's name group is derived from display label, it may have changed
-            const QString group(determineNameGroup(&*it));
-            if (group != it->nameGroup) {
-                if (!ignoreContactForNameGroups(it->contact)) {
-                    removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-
-                    it->nameGroup = group;
-                    addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-                }
-            }
+            contactDataChanged(it->iid);
+            reportItemUpdated(&*it);
         }
 
-        notifyNameGroupsChanged(modifiedGroups);
+        if (it->itemData) {
+            it->itemData->displayLabelOrderChanged(static_cast<DisplayLabelOrder>(order));
+        }
 
-        for (int i = 0; i < FilterTypesCount; ++i) {
-            const QList<ListModel *> &models = m_models[i];
-            for (int j = 0; j < models.count(); ++j) {
-                ListModel *model = models.at(j);
-                model->updateDisplayLabelOrder();
-                model->sourceItemsChanged();
+        // If the contact's name group is derived from display label, it may have changed
+        const QString group(determineNameGroup(&*it));
+        if (group != it->nameGroup) {
+            if (!ignoreContactForNameGroups(it->contact)) {
+                removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
+
+                it->nameGroup = group;
+                addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
             }
         }
     }
-#endif
+
+    notifyNameGroupsChanged(modifiedGroups);
+
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (int j = 0; j < models.count(); ++j) {
+            ListModel *model = models.at(j);
+            model->updateDisplayLabelOrder();
+            model->sourceItemsChanged();
+        }
+    }
 }
 
-void SeasideCache::sortPropertyChanged()
+void SeasideCache::sortPropertyChanged(const QString &sortProperty)
 {
-#ifdef HAS_MLITE
-    QVariant sortProperty = m_sortPropertyConf.value();
-    if (sortProperty.isValid() && sortProperty.toString() != m_sortProperty) {
-        const QString newProperty(sortProperty.toString());
-        if ((newProperty != QString::fromLatin1("firstName")) &&
-            (newProperty != QString::fromLatin1("lastName"))) {
-            qWarning() << "Invalid sort property configuration:" << newProperty;
-            return;
+    setSortOrder(sortProperty);
+
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (int j = 0; j < models.count(); ++j) {
+            models.at(j)->updateSortProperty();
+            // No need for sourceItemsChanged, as the sorted list update will cause that
         }
-
-        m_sortProperty = newProperty;
-        setSortOrder(m_sortProperty);
-
-        for (int i = 0; i < FilterTypesCount; ++i) {
-            const QList<ListModel *> &models = m_models[i];
-            for (int j = 0; j < models.count(); ++j) {
-                models.at(j)->updateSortProperty();
-                // No need for sourceItemsChanged, as the sorted list update will cause that
-            }
-        }
-
-        // Update the sorted list order
-        m_refreshRequired = true;
-        requestUpdate();
     }
-#endif
+
+    // Update the sorted list order
+    m_refreshRequired = true;
+    requestUpdate();
 }
 
-void SeasideCache::groupPropertyChanged()
+void SeasideCache::groupPropertyChanged(const QString &)
 {
-#ifdef HAS_MLITE
-    QVariant groupProperty = m_groupPropertyConf.value();
-    if (groupProperty.isValid() && groupProperty.toString() != m_groupProperty) {
-        const QString newProperty(groupProperty.toString());
-        if ((newProperty != QString::fromLatin1("firstName")) &&
-            (newProperty != QString::fromLatin1("lastName"))) {
-            qWarning() << "Invalid group property configuration:" << newProperty;
-            return;
-        }
+    // Update the name groups
+    QSet<QString> modifiedGroups;
 
-        m_groupProperty = newProperty;
+    typedef QHash<quint32, CacheItem>::iterator iterator;
+    for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
+        // Update the nameGroup for this contact
+        const QString group(determineNameGroup(&*it));
+        if (group != it->nameGroup) {
+            if (!ignoreContactForNameGroups(it->contact)) {
+                removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
 
-        // Update the name groups
-        QSet<QString> modifiedGroups;
-
-        typedef QHash<quint32, CacheItem>::iterator iterator;
-        for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
-            // Update the nameGroup for this contact
-            const QString group(determineNameGroup(&*it));
-            if (group != it->nameGroup) {
-                if (!ignoreContactForNameGroups(it->contact)) {
-                    removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-
-                    it->nameGroup = group;
-                    addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-                }
-            }
-        }
-
-        notifyNameGroupsChanged(modifiedGroups);
-
-        for (int i = 0; i < FilterTypesCount; ++i) {
-            const QList<ListModel *> &models = m_models[i];
-            for (int j = 0; j < models.count(); ++j) {
-                ListModel *model = models.at(j);
-                model->updateGroupProperty();
-                model->sourceItemsChanged();
+                it->nameGroup = group;
+                addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
             }
         }
     }
-#endif
+
+    notifyNameGroupsChanged(modifiedGroups);
+
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (int j = 0; j < models.count(); ++j) {
+            ListModel *model = models.at(j);
+            model->updateGroupProperty();
+            model->sourceItemsChanged();
+        }
+    }
 }
 
 void SeasideCache::displayStatusChanged(const QString &status)
