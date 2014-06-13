@@ -1138,6 +1138,12 @@ QString SeasideCache::generateDisplayLabelFromNonNameDetails(const QContact &con
         }
     }
 
+    // If this contact has organization details but no name, it probably represents that organization directly
+    QContactOrganization company = contact.detail<QContactOrganization>();
+    if (!company.name().isEmpty()) {
+        return company.name();
+    }
+
     // If none of the detail fields provides a label, fallback to the backend's label string, in
     // preference to using any of the addressing details directly
     const QString displayLabel = contact.detail<QContactDisplayLabel>().label();
@@ -1155,11 +1161,6 @@ QString SeasideCache::generateDisplayLabelFromNonNameDetails(const QContact &con
         if (!email.emailAddress().isEmpty()) {
             return email.emailAddress();
         }
-    }
-
-    QContactOrganization company = contact.detail<QContactOrganization>();
-    if (!company.name().isEmpty()) {
-        return company.name();
     }
 
     foreach (const QContactPhoneNumber& phone, contact.details<QContactPhoneNumber>()) {
