@@ -1271,33 +1271,35 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
     QContactFilter rv;
 
     QContactName name(contact.detail<QContactName>());
-    const QString firstName(name.firstName());
-    const QString lastName(name.lastName());
+    const QString firstName(name.firstName().trimmed());
+    const QString lastName(name.lastName().trimmed());
 
     if (firstName.isEmpty() && lastName.isEmpty()) {
         // Use the displayLabel to match with
-        QString label(contact.detail<QContactDisplayLabel>().label());
+        const QString label(contact.detail<QContactDisplayLabel>().label().trimmed());
 
-        // Partial match to first name
-        QContactDetailFilter firstNameFilter;
-        setDetailType<QContactName>(firstNameFilter, QContactName::FieldFirstName);
-        firstNameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
-        firstNameFilter.setValue(label);
-        rv = rv | firstNameFilter;
+        if (!label.isEmpty()) {
+            // Partial match to first name
+            QContactDetailFilter firstNameFilter;
+            setDetailType<QContactName>(firstNameFilter, QContactName::FieldFirstName);
+            firstNameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
+            firstNameFilter.setValue(label);
+            rv = rv | firstNameFilter;
 
-        // Partial match to last name
-        QContactDetailFilter lastNameFilter;
-        setDetailType<QContactName>(lastNameFilter, QContactName::FieldLastName);
-        lastNameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
-        lastNameFilter.setValue(label);
-        rv = rv | lastNameFilter;
+            // Partial match to last name
+            QContactDetailFilter lastNameFilter;
+            setDetailType<QContactName>(lastNameFilter, QContactName::FieldLastName);
+            lastNameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
+            lastNameFilter.setValue(label);
+            rv = rv | lastNameFilter;
 
-        // Partial match to nickname
-        QContactDetailFilter nicknameFilter;
-        setDetailType<QContactNickname>(nicknameFilter, QContactNickname::FieldNickname);
-        nicknameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
-        nicknameFilter.setValue(label);
-        rv = rv | nicknameFilter;
+            // Partial match to nickname
+            QContactDetailFilter nicknameFilter;
+            setDetailType<QContactNickname>(nicknameFilter, QContactNickname::FieldNickname);
+            nicknameFilter.setMatchFlags(QContactFilter::MatchContains | QContactFilter::MatchFixedString);
+            nicknameFilter.setValue(label);
+            rv = rv | nicknameFilter;
+        }
     } else {
         if (!firstName.isEmpty()) {
             // Partial match to first name
@@ -1342,7 +1344,7 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
 
     // Phone number match
     foreach (const QContactPhoneNumber &phoneNumber, contact.details<QContactPhoneNumber>()) {
-        const QString number(phoneNumber.number());
+        const QString number(phoneNumber.number().trimmed());
         if (number.isEmpty())
             continue;
 
@@ -1351,11 +1353,11 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
 
     // Email address match
     foreach (const QContactEmailAddress &emailAddress, contact.details<QContactEmailAddress>()) {
-        QString address(emailAddress.emailAddress());
+        QString address(emailAddress.emailAddress().trimmed());
         int index = address.indexOf(QChar::fromLatin1('@'));
         if (index > 0) {
             // Match any address that is the same up to the @ symbol
-            address = address.left(index);
+            address = address.left(index).trimmed();
         }
 
         if (address.isEmpty())
@@ -1370,11 +1372,11 @@ static QContactFilter filterForMergeCandidates(const QContact &contact)
 
     // Account URI match
     foreach (const QContactOnlineAccount &account, contact.details<QContactOnlineAccount>()) {
-        QString uri(account.accountUri());
+        QString uri(account.accountUri().trimmed());
         int index = uri.indexOf(QChar::fromLatin1('@'));
         if (index > 0) {
             // Match any account URI that is the same up to the @ symbol
-            uri = uri.left(index);
+            uri = uri.left(index).trimmed();
         }
 
         if (uri.isEmpty())
