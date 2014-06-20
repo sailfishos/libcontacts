@@ -40,7 +40,7 @@
 
 #include <QContact>
 
-#include <QVersitContactImporterPropertyHandler>
+#include <QVersitContactHandler>
 #include <QVersitResourceHandler>
 #include <QVersitDocument>
 #include <QVersitProperty>
@@ -56,10 +56,13 @@ QTVERSIT_USE_NAMESPACE
     a file, and then the path to the file needs to be saved
     to the backend as a contact avatar url detail.
 
+    The X-NEMOMOBILE-SYNCTARGET property is supported for specifying
+    the sync target of a contact.
+
     Also support the X-NEMOMOBILE-ONLINEACCOUNT-DEMO property
     for loading demo online account data.
 */
-class CONTACTCACHE_EXPORT SeasidePropertyHandler : public QVersitContactImporterPropertyHandlerV2
+class CONTACTCACHE_EXPORT SeasidePropertyHandler : public QVersitContactHandler
 {
 public:
     SeasidePropertyHandler();
@@ -69,6 +72,11 @@ public:
     void documentProcessed(const QVersitDocument &, QContact *);
     void propertyProcessed(const QVersitDocument &, const QVersitProperty &property,
                            const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails);
+
+    // QVersitContactExporterDetailHandlerV2
+    void contactProcessed(const QContact &, QVersitDocument *);
+    void detailProcessed(const QContact &, const QContactDetail &detail,
+                         const QVersitDocument &, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded);
 };
 
 #endif // PROPERTYHANDLER_H

@@ -37,6 +37,7 @@ HEADERS += contactmanagerengine.h
 SOURCES += \
     $$PWD/cacheconfiguration.cpp \
     $$PWD/seasidecache.cpp \
+    $$PWD/seasideexport.cpp \
     $$PWD/seasideimport.cpp \
     $$PWD/seasidepropertyhandler.cpp
 
@@ -44,6 +45,7 @@ HEADERS += \
     $$PWD/cacheconfiguration.h \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
+    $$PWD/seasideexport.h \
     $$PWD/seasideimport.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
@@ -53,6 +55,7 @@ headers.files = \
     $$PWD/cacheconfiguration.h \
     $$PWD/contactcacheexport.h \
     $$PWD/seasidecache.h \
+    $$PWD/seasideexport.h \
     $$PWD/seasideimport.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
