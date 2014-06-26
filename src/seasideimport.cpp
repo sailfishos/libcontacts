@@ -290,6 +290,36 @@ void setNickname(QContact &contact, const QString &text)
     contact.saveDetail(&nick);
 }
 
+bool allCharactersMatchScript(const QString &s, QChar::Script script)
+{
+    for (int i=0; i<s.length(); i++) {
+        if (s[i].script() != script) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool applyNameFixes(QContactName *nameDetail)
+{
+    // Chinese names shouldn't have a middle name, so if it is present in a Han-script-only
+    // name, it is probably wrong and it should be prepended to the first name instead.
+    QString middleName = nameDetail->middleName();
+    if (middleName.isEmpty()) {
+        return false;
+    }
+    QString firstName = nameDetail->firstName();
+    QString lastName = nameDetail->lastName();
+    if (!allCharactersMatchScript(middleName, QChar::Script_Han)
+            || (!firstName.isEmpty() && !allCharactersMatchScript(firstName, QChar::Script_Han))
+            || (!lastName.isEmpty() && !allCharactersMatchScript(lastName, QChar::Script_Han))) {
+        return false;
+    }
+    nameDetail->setFirstName(middleName + firstName);
+    nameDetail->setMiddleName(QString());
+    return true;
+}
+
 }
 
 QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> &details, int *newCount, int *updatedCount)
@@ -307,6 +337,15 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
     QList<QContact> importedContacts(importer.contacts());
 
+    QList<QContact>::iterator it;
+    for (it = importedContacts.begin(); it != importedContacts.end(); ++it) {
+        QContact &contact(*it);
+        QContactName nameDetail = contact.detail<QContactName>();
+        if (applyNameFixes(&nameDetail)) {
+            contact.saveDetail(&nameDetail);
+        }
+    }
+
     QHash<QString, int> importGuids;
     QHash<QString, int> importNames;
     QHash<QString, int> importLabels;
@@ -319,7 +358,7 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     unimportableDetailTypes.insert(QContactDetail::TypeVersion);
 
     // Merge any duplicates in the import list
-    QList<QContact>::iterator it = importedContacts.begin();
+    it = importedContacts.begin();
     while (it != importedContacts.end()) {
         QContact &contact(*it);
 
