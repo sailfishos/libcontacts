@@ -83,12 +83,14 @@ QContactFetchHint basicFetchHint()
 
 QContactFilter localContactFilter()
 {
-    // Contacts that are local to the device have sync target 'local' or 'was_local'
-    QContactDetailFilter filterLocal, filterWasLocal;
+    // Contacts that are local to the device have sync target 'local' or 'was_local' or 'bluetooth'
+    QContactDetailFilter filterLocal, filterWasLocal, filterBluetooth;
     filterLocal.setDetailType(QContactSyncTarget::Type, QContactSyncTarget::FieldSyncTarget);
     filterWasLocal.setDetailType(QContactSyncTarget::Type, QContactSyncTarget::FieldSyncTarget);
+    filterBluetooth.setDetailType(QContactSyncTarget::Type, QContactSyncTarget::FieldSyncTarget);
     filterLocal.setValue(QString::fromLatin1("local"));
     filterWasLocal.setValue(QString::fromLatin1("was_local"));
+    filterBluetooth.setValue(QString::fromLatin1("bluetooth"));
 
     return filterLocal | filterWasLocal;
 }
@@ -315,7 +317,6 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     unimportableDetailTypes.insert(QContactDetail::TypeFamily);
     unimportableDetailTypes.insert(QContactDetail::TypeGeoLocation);
     unimportableDetailTypes.insert(QContactDetail::TypeGlobalPresence);
-    unimportableDetailTypes.insert(QContactDetail::TypeSyncTarget);
     unimportableDetailTypes.insert(QContactDetail::TypeVersion);
 
     // Merge any duplicates in the import list
@@ -325,7 +326,17 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
 
         // Remove any details that our backend can't store
         foreach (QContactDetail detail, contact.details()) {
-            if (unimportableDetailTypes.contains(detail.type())) {
+            if (detail.type() == QContactSyncTarget::Type) {
+                // We allow some syncTarget values
+                const QString syncTarget(detail.value<QString>(QContactSyncTarget::FieldSyncTarget));
+                if (syncTarget == QStringLiteral("was_local") ||
+                    syncTarget == QStringLiteral("bluetooth")) {
+                    // These values are permissible
+                } else {
+                    qDebug() << "  Removing unimportable syncTarget:" << syncTarget;
+                    contact.removeDetail(&detail);
+                }
+            } else if (unimportableDetailTypes.contains(detail.type())) {
                 qDebug() << "  Removing unimportable detail:" << detail;
                 contact.removeDetail(&detail);
             }

@@ -35,24 +35,12 @@
 #include <QContactAvatar>
 #include <QContactOnlineAccount>
 #include <QContactPresence>
+#include <QContactSyncTarget>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QImage>
 
 #include <qtcontacts-extensions.h>
-
-SeasidePropertyHandler::SeasidePropertyHandler()
-{
-}
-
-SeasidePropertyHandler::~SeasidePropertyHandler()
-{
-}
-
-void SeasidePropertyHandler::documentProcessed(const QVersitDocument &, QContact *)
-{
-    // do nothing, have no state to clean.
-}
 
 namespace {
 
@@ -188,14 +176,93 @@ void processOnlineAccount(const QVersitProperty &property, bool *alreadyProcesse
     }
 }
 
+void processSyncTarget(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+{
+    // Set the sync target for this contact, if appropriate
+
+    // Try to interpret the data as a string
+    const QString data(property.variantValue().toString().toLower());
+
+    if (data == QString::fromLatin1("bluetooth") || data == QString::fromLatin1("was_local")) {
+        QList<QContactDetail>::iterator it = updatedDetails->begin(), end = updatedDetails->end();
+        for ( ; it != end; ++it) {
+            if ((*it).type() == QContactSyncTarget::Type)
+                break;
+        }
+        if (it != end) {
+            QContactSyncTarget &syncTarget(static_cast<QContactSyncTarget &>(*it));
+            syncTarget.setSyncTarget(data);
+        } else {
+            QContactSyncTarget syncTarget;
+            syncTarget.setSyncTarget(data);
+            updatedDetails->append(syncTarget);
+        }
+
+        *alreadyProcessed = true;
+    } else {
+        qWarning() << "Invalid syncTarget data:" << data;
+    }
 }
 
-void SeasidePropertyHandler::propertyProcessed(const QVersitDocument &, const QVersitProperty &property, const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+void processSyncTarget(const QContactSyncTarget &detail, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded)
 {
-    if (property.name().toLower() == QLatin1String("photo")) {
+    Q_UNUSED(processedFields)
+    Q_UNUSED(toBeRemoved)
+
+    // Include the sync target in the export if it is not 'local' but is exportable
+    const QString syncTarget(detail.syncTarget());
+
+    if (syncTarget == QString::fromLatin1("bluetooth") || syncTarget == QString::fromLatin1("was_local")) {
+        QVersitProperty stProperty;
+        stProperty.setName(QString::fromLatin1("X-NEMOMOBILE-SYNCTARGET"));
+        stProperty.setValue(syncTarget);
+
+        toBeAdded->append(stProperty);
+    } else if (!syncTarget.isEmpty() && syncTarget != QString::fromLatin1("local")) {
+        qWarning() << "Invalid syncTarget for export:" << syncTarget;
+    }
+}
+
+}
+
+SeasidePropertyHandler::SeasidePropertyHandler()
+{
+}
+
+SeasidePropertyHandler::~SeasidePropertyHandler()
+{
+}
+
+void SeasidePropertyHandler::documentProcessed(const QVersitDocument &, QContact *)
+{
+    // do nothing, have no state to clean.
+}
+
+void SeasidePropertyHandler::propertyProcessed(const QVersitDocument &, const QVersitProperty &property,
+                                               const QContact &, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+{
+    const QString propertyName(property.name().toLower());
+
+    if (propertyName == QLatin1String("photo")) {
         processPhoto(property, alreadyProcessed, updatedDetails);
-    } else if (property.name().toLower() == QLatin1String("x-nemomobile-onlineaccount-demo")) {
+    } else if (propertyName == QLatin1String("x-nemomobile-onlineaccount-demo")) {
         processOnlineAccount(property, alreadyProcessed, updatedDetails);
+    } else if (propertyName == QLatin1String("x-nemomobile-synctarget")) {
+        processSyncTarget(property, alreadyProcessed, updatedDetails);
+    }
+}
+
+void SeasidePropertyHandler::contactProcessed(const QContact &c, QVersitDocument *)
+{
+}
+
+void SeasidePropertyHandler::detailProcessed(const QContact &, const QContactDetail &detail,
+                                             const QVersitDocument &, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded)
+{
+    const QContactDetail::DetailType detailType(detail.type());
+
+    if (detailType == QContactSyncTarget::Type) {
+        processSyncTarget(static_cast<const QContactSyncTarget &>(detail), processedFields, toBeRemoved, toBeAdded);
     }
 }
 
