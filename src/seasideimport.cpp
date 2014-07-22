@@ -45,6 +45,8 @@
 #include <QContactAvatar>
 #include <QContactBirthday>
 #include <QContactEmailAddress>
+#include <QContactFamily>
+#include <QContactGeoLocation>
 #include <QContactGuid>
 #include <QContactHobby>
 #include <QContactName>
@@ -255,6 +257,8 @@ bool mergeIntoExistingContact(QContact *updateContact, const QContact &importedC
     rv |= updateExistingDetails<QContactAvatar>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactBirthday>(updateContact, importedContact, true);
     rv |= updateExistingDetails<QContactEmailAddress>(updateContact, importedContact);
+    rv |= updateExistingDetails<QContactFamily>(updateContact, importedContact);
+    rv |= updateExistingDetails<QContactGeoLocation>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactGuid>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactHobby>(updateContact, importedContact);
     rv |= updateExistingDetails<QContactNickname>(updateContact, importedContact);
@@ -314,8 +318,6 @@ QList<QContact> SeasideImport::buildImportContacts(const QList<QVersitDocument> 
     QHash<QString, int> importLabels;
 
     QSet<QContactDetail::DetailType> unimportableDetailTypes;
-    unimportableDetailTypes.insert(QContactDetail::TypeFamily);
-    unimportableDetailTypes.insert(QContactDetail::TypeGeoLocation);
     unimportableDetailTypes.insert(QContactDetail::TypeGlobalPresence);
     unimportableDetailTypes.insert(QContactDetail::TypeVersion);
 
