@@ -94,7 +94,7 @@ QContactFilter localContactFilter()
     filterWasLocal.setValue(QString::fromLatin1("was_local"));
     filterBluetooth.setValue(QString::fromLatin1("bluetooth"));
 
-    return filterLocal | filterWasLocal;
+    return filterLocal | filterWasLocal | filterBluetooth;
 }
 
 bool nameIsEmpty(const QContactName &name)
