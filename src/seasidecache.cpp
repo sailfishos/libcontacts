@@ -2398,14 +2398,13 @@ void SeasideCache::notifyNameGroupsChanged(const QSet<QString> &groups)
 
 void SeasideCache::contactIdsAvailable()
 {
-    if (!m_contactsToFetchCandidates.isEmpty()) {
-        foreach (const QContactId &id, m_contactIdRequest.ids()) {
-            m_candidateIds.insert(id);
+    if (m_syncFilter == FilterNone) {
+        if (!m_contactsToFetchCandidates.isEmpty()) {
+            foreach (const QContactId &id, m_contactIdRequest.ids()) {
+                m_candidateIds.insert(id);
+            }
         }
-        return;
-    }
-
-    if (m_syncFilter != FilterNone) {
+    } else {
         synchronizeList(this, m_contacts[m_syncFilter], m_cacheIndex, internalIds(m_contactIdRequest.ids()), m_queryIndex);
     }
 }
