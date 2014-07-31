@@ -401,6 +401,7 @@ private:
 
     int contactIndex(quint32 iid, FilterType filter);
 
+    static QContactRelationship makeRelationship(const QString &type, const QContactId &id1, const QContactId &id2);
     static QContactRelationship makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2);
 
     QList<quint32> m_contacts[FilterTypesCount];
