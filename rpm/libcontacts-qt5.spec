@@ -1,6 +1,6 @@
 Name:       libcontacts-qt5
 Summary:    Nemo contact cache library
-Version:    0.0.0
+Version:    0.0.71
 Release:    1
 Group:      System/Libraries
 License:    BSD
@@ -40,7 +40,7 @@ Requires:   %{name} = %{version}-%{release}
 
 %build
 
-%qmake5 
+%qmake5 VERSION=%{version}
 
 make %{?_smp_mflags}
 
