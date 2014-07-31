@@ -82,6 +82,7 @@ Q_GLOBAL_STATIC(CacheConfiguration, cacheConfig)
 ML10N::MLocale mLocale;
 
 const QString aggregateRelationshipType = QContactRelationship::Aggregates();
+const QString isNotRelationshipType = QString::fromLatin1("IsNot");
 
 const QString syncTargetLocal = QLatin1String("local");
 const QString syncTargetWasLocal = QLatin1String("was_local");
@@ -2980,7 +2981,7 @@ void SeasideCache::aggregateContacts(const QContact &contact1, const QContact &c
 void SeasideCache::disaggregateContacts(const QContact &contact1, const QContact &contact2)
 {
     instancePtr->m_relationshipsToRemove.append(makeRelationship(aggregateRelationshipType, contact1, contact2));
-    instancePtr->m_relationshipsToSave.append(makeRelationship(QLatin1String("IsNot"), contact1, contact2));
+    instancePtr->m_relationshipsToSave.append(makeRelationship(isNotRelationshipType, contact1, contact2));
 
     if (contact2.detail<QContactSyncTarget>().syncTarget() == syncTargetWasLocal) {
         // restore the local sync target that was changed in a previous link creation operation
@@ -3052,9 +3053,12 @@ void SeasideCache::completeContactAggregation(const QContactId &contact1Id, cons
     // For each constituent of contact2, add a relationship between it and contact1, and remove the
     // relationship between it and contact2.
     foreach (int id, constituents2) {
-        QContact c = contactById(apiId(id));
-        m_relationshipsToSave.append(makeRelationship(aggregateRelationshipType, contactById(contact1Id), c));
-        m_relationshipsToRemove.append(makeRelationship(aggregateRelationshipType, contactById(contact2Id), c));
+        const QContactId constituentId(apiId(id));
+        m_relationshipsToSave.append(makeRelationship(aggregateRelationshipType, contact1Id, constituentId));
+        m_relationshipsToRemove.append(makeRelationship(aggregateRelationshipType, contact2Id, constituentId));
+
+        // If there is an existing IsNot relationship, remove that
+        m_relationshipsToRemove.append(makeRelationship(isNotRelationshipType, contact1Id, constituentId));
     }
 
     if (!m_relationshipsToSave.isEmpty() || !m_relationshipsToRemove.isEmpty())
@@ -3134,13 +3138,21 @@ int SeasideCache::contactIndex(quint32 iid, FilterType filterType)
     return cacheIds.indexOf(iid);
 }
 
-QContactRelationship SeasideCache::makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2)
+QContactRelationship SeasideCache::makeRelationship(const QString &type, const QContactId &id1, const QContactId &id2)
 {
+    QContact first, second;
+    first.setId(id1);
+    second.setId(id2);
     QContactRelationship relationship;
     relationship.setRelationshipType(type);
-    relationship.setFirst(contact1);
-    relationship.setSecond(contact2);
+    relationship.setFirst(first);
+    relationship.setSecond(second);
     return relationship;
+}
+
+QContactRelationship SeasideCache::makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2)
+{
+    return makeRelationship(type, contact1.id(), contact2.id());
 }
 
 // Instantiate the contact ID functions for qtcontacts-sqlite
