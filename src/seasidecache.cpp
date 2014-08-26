@@ -3057,8 +3057,10 @@ void SeasideCache::completeContactAggregation(const QContactId &contact1Id, cons
         m_relationshipsToSave.append(makeRelationship(aggregateRelationshipType, contact1Id, constituentId));
         m_relationshipsToRemove.append(makeRelationship(aggregateRelationshipType, contact2Id, constituentId));
 
-        // If there is an existing IsNot relationship, remove that
-        m_relationshipsToRemove.append(makeRelationship(isNotRelationshipType, contact1Id, constituentId));
+        // If there is an existing IsNot relationship, it would be better to remove it;
+        // unfortunately, we can't be certain that it exists, and if it does not, the
+        // relationship removal will fail - hence, better to ignore the possibility:
+        //m_relationshipsToRemove.append(makeRelationship(isNotRelationshipType, contact1Id, constituentId));
     }
 
     if (!m_relationshipsToSave.isEmpty() || !m_relationshipsToRemove.isEmpty())
