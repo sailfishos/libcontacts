@@ -1751,6 +1751,7 @@ bool SeasideCache::event(QEvent *event)
     if (event->type() != QEvent::UpdateRequest)
         return QObject::event(event);
 
+    m_updatesPending = false;
     bool idleProcessing = false;
     startRequest(&idleProcessing);
 
@@ -1766,14 +1767,11 @@ bool SeasideCache::event(QEvent *event)
         applyPendingContactUpdates();
 
         // Send another event to trigger further processing
-        QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
+        requestUpdate();
         return true;
     }
 
     if (idleProcessing) {
-        // We have nothing pending to do
-        m_updatesPending = false;
-
         // Remove expired contacts when all other activity has been processed
         if (!m_expiredContacts.isEmpty()) {
             QList<quint32> removeIds;
@@ -2217,6 +2215,7 @@ void SeasideCache::contactsAvailable()
         } else {
             m_contactsToAppend.insert(type, qMakePair(queryDetailTypes, contacts));
         }
+        requestUpdate();
     } else {
         if (m_activeResolve || (request == &m_fetchByIdRequest)) {
             // Process these results immediately
@@ -2704,7 +2703,7 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
     }
 
     // See if there are any more requests to dispatch
-    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest));
+    requestUpdate();
 }
 
 void SeasideCache::makePopulated(FilterType filter)
