@@ -1718,7 +1718,9 @@ void SeasideCache::startRequest(bool *idleProcessing)
 
                 // Load extra data items that we want to be able to search on, if not already fetched
                 if (unfetchedTypes & SeasideCache::FetchOrganization) {
-                    fetchType = SeasideCache::FetchOrganization;
+                    // since this uses allFilter(), might as well grab
+                    // all the missing detail types
+                    fetchType = unfetchedTypes;
                     m_fetchRequest.setFilter(allFilter());
                 } else if (unfetchedTypes & SeasideCache::FetchPhoneNumber) {
                     fetchType = SeasideCache::FetchPhoneNumber;
