@@ -490,6 +490,7 @@ SeasideCache::SeasideCache()
     , m_fetchByIdProcessedCount(0)
     , m_keepPopulated(false)
     , m_populateProgress(Unpopulated)
+    , m_populating(0)
     , m_fetchTypes(0)
     , m_extraFetchTypes(0)
     , m_dataTypesFetched(0)
@@ -1414,6 +1415,76 @@ void SeasideCache::startRequest(bool *idleProcessing)
 
     // Test these conditions in priority order
 
+    const int maxPriorityIds = 20;
+
+    // First priority goes to refreshing small numbers of contacts,
+    // because these likely came from UI elements calling ensureCompletion()
+    if (!m_changedContacts.isEmpty() && m_changedContacts.count() < maxPriorityIds) {
+        if (m_fetchRequest.isActive()) {
+            requestPending = true;
+        } else {
+            QContactIdFilter filter;
+            filter.setIds(m_changedContacts);
+            m_changedContacts.clear();
+
+            // A local ID filter will fetch all contacts, rather than just aggregates;
+            // we only want to retrieve aggregate contacts that have changed
+            m_fetchRequest.setFilter(filter & aggregateFilter());
+            m_fetchRequest.setFetchHint(basicFetchHint());
+            m_fetchRequest.setSorting(QList<QContactSortOrder>());
+            m_fetchRequest.start();
+
+            m_fetchProcessedCount = 0;
+        }
+    }
+
+    // Next priority is handling address resolution requests,
+    // because these are used to populate the libcommhistory models,
+    // particularly RecentContactsModel which the user may want to
+    // interact with immediately.
+    if (!m_resolveAddresses.isEmpty()) {
+        if (m_fetchRequest.isActive()) {
+            requestPending = true;
+        } else {
+            const ResolveData &resolve = m_resolveAddresses.first();
+
+            if (resolve.first.isEmpty()) {
+                // Search for phone number
+                m_fetchRequest.setFilter(QContactPhoneNumber::match(resolve.second));
+            } else if (resolve.second.isEmpty()) {
+                // Search for email address
+                QContactDetailFilter detailFilter;
+                setDetailType<QContactEmailAddress>(detailFilter, QContactEmailAddress::FieldEmailAddress);
+                detailFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
+                detailFilter.setValue(resolve.first);
+
+                m_fetchRequest.setFilter(detailFilter);
+            } else {
+                // Search for online account
+                QContactDetailFilter localFilter;
+                setDetailType<QContactOnlineAccount>(localFilter, QContactOnlineAccount__FieldAccountPath);
+                localFilter.setValue(resolve.first);
+
+                QContactDetailFilter remoteFilter;
+                setDetailType<QContactOnlineAccount>(remoteFilter, QContactOnlineAccount::FieldAccountUri);
+                remoteFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
+                remoteFilter.setValue(resolve.second);
+
+                m_fetchRequest.setFilter(localFilter & remoteFilter);
+            }
+
+            // If completion is not required, we need to at least retrieve as much detail
+            // as the favorites store, so we don't update any favorite with a smaller data subset
+            m_activeResolve = &resolve;
+            m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes | m_extraFetchTypes));
+            m_fetchRequest.setSorting(QList<QContactSortOrder>());
+            m_fetchRequest.start();
+
+            m_fetchProcessedCount = 0;
+        }
+    }
+
+
     if (m_keepPopulated && (m_populateProgress != Populated)) {
         // We must populate the cache before we can do anything else
         if (m_fetchRequest.isActive()) {
@@ -1429,6 +1500,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchProcessedCount = 0;
                 m_populateProgress = FetchFavorites;
                 m_dataTypesFetched |= m_fetchTypes;
+                m_populating = true;
             } else if (m_populateProgress == FetchMetadata) {
                 // Next, query for all contacts
                 // Request the metadata of all contacts (only data from the primary table, and any
@@ -1439,6 +1511,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchRequest.start();
 
                 m_fetchProcessedCount = 0;
+                m_populating = true;
             } else if (m_populateProgress == FetchOnline) {
                 // Now query for online contacts - fetch the account details, so we know if they're valid
                 m_fetchRequest.setFilter(onlineFilter());
@@ -1447,6 +1520,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchRequest.start();
 
                 m_fetchProcessedCount = 0;
+                m_populating = true;
             }
         }
 
@@ -1605,48 +1679,6 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchProcessedCount = 0;
                 m_dataTypesFetched |= unfetchedTypes;
             }
-        }
-    }
-
-    if (!m_resolveAddresses.isEmpty()) {
-        if (m_fetchRequest.isActive()) {
-            requestPending = true;
-        } else {
-            const ResolveData &resolve = m_resolveAddresses.first();
-
-            if (resolve.first.isEmpty()) {
-                // Search for phone number
-                m_fetchRequest.setFilter(QContactPhoneNumber::match(resolve.second));
-            } else if (resolve.second.isEmpty()) {
-                // Search for email address
-                QContactDetailFilter detailFilter;
-                setDetailType<QContactEmailAddress>(detailFilter, QContactEmailAddress::FieldEmailAddress);
-                detailFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
-                detailFilter.setValue(resolve.first);
-
-                m_fetchRequest.setFilter(detailFilter);
-            } else {
-                // Search for online account
-                QContactDetailFilter localFilter;
-                setDetailType<QContactOnlineAccount>(localFilter, QContactOnlineAccount__FieldAccountPath);
-                localFilter.setValue(resolve.first);
-
-                QContactDetailFilter remoteFilter;
-                setDetailType<QContactOnlineAccount>(remoteFilter, QContactOnlineAccount::FieldAccountUri);
-                remoteFilter.setMatchFlags(QContactFilter::MatchExactly | QContactFilter::MatchFixedString); // allow case insensitive
-                remoteFilter.setValue(resolve.second);
-
-                m_fetchRequest.setFilter(localFilter & remoteFilter);
-            }
-
-            // If completion is not required, we need to at least retrieve as much detail
-            // as the favorites store, so we don't update any favorite with a smaller data subset
-            m_activeResolve = &resolve;
-            m_fetchRequest.setFetchHint(resolve.requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes | m_extraFetchTypes));
-            m_fetchRequest.setSorting(QList<QContactSortOrder>());
-            m_fetchRequest.start();
-
-            m_fetchProcessedCount = 0;
         }
     }
 
@@ -2205,8 +2237,8 @@ void SeasideCache::contactsAvailable()
     }
     const bool partialFetch = !queryDetailTypes.isEmpty();
 
-    if (m_populateProgress > Unpopulated && m_populateProgress < Populated) {
-        // We are populating the cache
+    if (m_populating) {
+        Q_ASSERT(m_populateProgress > Unpopulated && m_populateProgress < Populated);
         FilterType type(m_populateProgress == FetchFavorites ? FilterFavorites
                                                              : (m_populateProgress == FetchMetadata ? FilterAll
                                                                                                     : FilterOnline));
@@ -2633,29 +2665,33 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
             m_aggregatedContacts.clear();
         }
     } else if (request == &m_fetchRequest) {
-        if (m_populateProgress == FetchFavorites) {
-            if (m_contactsToAppend.find(FilterFavorites) == m_contactsToAppend.end()) {
-                // No pending contacts, the models are now populated
-                makePopulated(FilterFavorites);
-                qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
-            }
+        if (m_populating) {
+            Q_ASSERT(m_populateProgress > Unpopulated && m_populateProgress < Populated);
+            if (m_populateProgress == FetchFavorites) {
+                if (m_contactsToAppend.find(FilterFavorites) == m_contactsToAppend.end()) {
+                    // No pending contacts, the models are now populated
+                    makePopulated(FilterFavorites);
+                    qDebug() << "Favorites queried in" << m_timer.elapsed() << "ms";
+                }
 
-            m_populateProgress = FetchMetadata;
-        } else if (m_populateProgress == FetchMetadata) {
-            if (m_contactsToAppend.find(FilterAll) == m_contactsToAppend.end()) {
-                makePopulated(FilterNone);
-                makePopulated(FilterAll);
-                qDebug() << "All queried in" << m_timer.elapsed() << "ms";
-            }
+                m_populateProgress = FetchMetadata;
+            } else if (m_populateProgress == FetchMetadata) {
+                if (m_contactsToAppend.find(FilterAll) == m_contactsToAppend.end()) {
+                    makePopulated(FilterNone);
+                    makePopulated(FilterAll);
+                    qDebug() << "All queried in" << m_timer.elapsed() << "ms";
+                }
 
-            m_populateProgress = FetchOnline;
-        } else if (m_populateProgress == FetchOnline) {
-            if (m_contactsToAppend.find(FilterOnline) == m_contactsToAppend.end()) {
-                makePopulated(FilterOnline);
-                qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
-            }
+                m_populateProgress = FetchOnline;
+            } else if (m_populateProgress == FetchOnline) {
+                if (m_contactsToAppend.find(FilterOnline) == m_contactsToAppend.end()) {
+                    makePopulated(FilterOnline);
+                    qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
+                }
 
-            m_populateProgress = Populated;
+                m_populateProgress = Populated;
+            }
+            m_populating = false;
         } else {
             // Result of a specific query
             if (m_activeResolve) {

@@ -454,6 +454,7 @@ private:
     QString m_groupProperty;
     bool m_keepPopulated;
     PopulateProgress m_populateProgress;
+    bool m_populating; // true if current m_fetchRequest makes progress
     quint32 m_fetchTypes;
     quint32 m_extraFetchTypes;
     quint32 m_dataTypesFetched;
