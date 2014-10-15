@@ -1415,9 +1415,27 @@ void SeasideCache::startRequest(bool *idleProcessing)
 
     // Test these conditions in priority order
 
+    // Start by loading the favorites model, because it's so small and
+    // the user is likely to want to interact with it.
+    if (m_keepPopulated && (m_populateProgress == Unpopulated)) {
+        if (m_fetchRequest.isActive()) {
+            requestPending = true;
+        } else {
+            m_fetchRequest.setFilter(favoriteFilter());
+            m_fetchRequest.setFetchHint(favoriteFetchHint(m_fetchTypes));
+            m_fetchRequest.setSorting(m_sortOrder);
+            m_fetchRequest.start();
+
+            m_fetchProcessedCount = 0;
+            m_populateProgress = FetchFavorites;
+            m_dataTypesFetched |= m_fetchTypes;
+            m_populating = true;
+        }
+    }
+
     const int maxPriorityIds = 20;
 
-    // First priority goes to refreshing small numbers of contacts,
+    // Next priority is refreshing small numbers of contacts,
     // because these likely came from UI elements calling ensureCompletion()
     if (!m_changedContacts.isEmpty() && m_changedContacts.count() < maxPriorityIds) {
         if (m_fetchRequest.isActive()) {
@@ -1485,24 +1503,13 @@ void SeasideCache::startRequest(bool *idleProcessing)
     }
 
 
+    // Then populate the rest of the cache before doing anything else.
     if (m_keepPopulated && (m_populateProgress != Populated)) {
-        // We must populate the cache before we can do anything else
         if (m_fetchRequest.isActive()) {
             requestPending = true;
         } else {
-            if (m_populateProgress == Unpopulated) {
-                // Start a query to fully populate the cache, starting with favorites
-                m_fetchRequest.setFilter(favoriteFilter());
-                m_fetchRequest.setFetchHint(favoriteFetchHint(m_fetchTypes));
-                m_fetchRequest.setSorting(m_sortOrder);
-                m_fetchRequest.start();
-
-                m_fetchProcessedCount = 0;
-                m_populateProgress = FetchFavorites;
-                m_dataTypesFetched |= m_fetchTypes;
-                m_populating = true;
-            } else if (m_populateProgress == FetchMetadata) {
-                // Next, query for all contacts
+            if (m_populateProgress == FetchMetadata) {
+                // Query for all contacts
                 // Request the metadata of all contacts (only data from the primary table, and any
                 // other details required to determine whether the contacts matches the filter)
                 m_fetchRequest.setFilter(allFilter());
