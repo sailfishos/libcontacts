@@ -342,6 +342,7 @@ private slots:
     void contactIdsAvailable();
     void relationshipsAvailable();
     void requestStateChanged(QContactAbstractRequest::State state);
+    void addressRequestStateChanged(QContactAbstractRequest::State state);
     void updateContacts();
     void contactsAdded(const QList<QContactId> &contactIds);
     void contactsChanged(const QList<QContactId> &contactIds);
@@ -373,7 +374,7 @@ private:
     void fetchContacts();
     void updateContacts(const QList<QContactId> &contactIds, QList<QContactId> *updateList);
     void applyPendingContactUpdates();
-    void applyContactUpdates(const QList<QContact> &contacts, bool partialFetch, const QSet<QContactDetail::DetailType> &queryDetailTypes);
+    void applyContactUpdates(const QList<QContact> &contacts, const QSet<QContactDetail::DetailType> &queryDetailTypes);
 
     void resolveUnknownAddresses(const QString &first, const QString &second, CacheItem *item);
     bool updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<QContactDetail::DetailType> &queryDetailTypes, CacheItem *item);
@@ -471,11 +472,11 @@ private:
         QString compare;
         bool requireComplete;
         ResolveListener *listener;
+        QContactFetchRequest *fetchRequest;
     };
     QList<ResolveData> m_resolveAddresses;
     QList<ResolveData> m_unknownResolveAddresses;
     QList<ResolveData> m_unknownAddresses;
-    const ResolveData *m_activeResolve;
     QSet<QString> m_resolvedPhoneNumbers;
 
     QElapsedTimer m_timer;
