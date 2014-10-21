@@ -472,9 +472,8 @@ private:
         QString compare;
         bool requireComplete;
         ResolveListener *listener;
-        QContactFetchRequest *fetchRequest;
     };
-    QList<ResolveData> m_resolveAddresses;
+    QHash<QContactFetchRequest *, ResolveData> m_resolveAddresses;
     QList<ResolveData> m_unknownResolveAddresses;
     QList<ResolveData> m_unknownAddresses;
     QSet<QString> m_resolvedPhoneNumbers;

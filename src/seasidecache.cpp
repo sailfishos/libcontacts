@@ -663,25 +663,23 @@ void SeasideCache::unregisterResolveListener(ResolveListener *listener)
     if (!instancePtr)
         return;
 
-    QList<ResolveData>::iterator it = instancePtr->m_resolveAddresses.begin();
+    QHash<QContactFetchRequest *, ResolveData>::iterator it = instancePtr->m_resolveAddresses.begin();
     while (it != instancePtr->m_resolveAddresses.end()) {
-        if (it->listener == listener) {
-            if (it->fetchRequest) {
-                it->fetchRequest->cancel();
-                delete it->fetchRequest;
-            }
+        if (it.value().listener == listener) {
+            it.key()->cancel();
+            delete it.key();
             it = instancePtr->m_resolveAddresses.erase(it);
         } else {
             ++it;
         }
     }
 
-    it = instancePtr->m_unknownAddresses.begin();
-    while (it != instancePtr->m_unknownAddresses.end()) {
-        if (it->listener == listener) {
-            it = instancePtr->m_unknownAddresses.erase(it);
+    QList<ResolveData>::iterator it2 = instancePtr->m_unknownAddresses.begin();
+    while (it2 != instancePtr->m_unknownAddresses.end()) {
+        if (it2->listener == listener) {
+            it2 = instancePtr->m_unknownAddresses.erase(it2);
         } else {
-            ++it;
+            ++it2;
         }
     }
 }
@@ -2664,53 +2662,52 @@ void SeasideCache::addressRequestStateChanged(QContactAbstractRequest::State sta
     applyContactUpdates(request->contacts(), queryDetailTypes);
 
     // now figure out which address was being resolved and resolve it
-    QList<ResolveData>::iterator it = instancePtr->m_resolveAddresses.begin();
-    for ( ; it != instancePtr->m_resolveAddresses.end(); ++it) {
-        if (request == it->fetchRequest) {
-            ResolveData data(*it);
-            if (data.first == QString()) {
-                // We have now queried this phone number
-                m_resolvedPhoneNumbers.insert(minimizePhoneNumber(data.second));
-            }
-
-            CacheItem *item = 0;
-            QList<QContact> resolvedContacts(data.fetchRequest->contacts());
-            delete data.fetchRequest;
-            data.fetchRequest = 0;
-
-            if (!resolvedContacts.isEmpty()) {
-                if (resolvedContacts.count() == 1) {
-                    item = itemById(apiId(resolvedContacts.first()), false);
-                } else {
-                    // Lookup the result in our updated indexes
-                    if (data.first == QString()) {
-                        item = itemByPhoneNumber(data.second, false);
-                    } else if (data.second == QString()) {
-                        item = itemByEmailAddress(data.first, false);
-                    } else {
-                        item = itemByOnlineAccount(data.first, data.second, false);
-                    }
-                }
-            } else {
-                // This address is unknown - keep it for later resolution
-                if (data.first == QString()) {
-                    // Compare this phone number in minimized form
-                    data.compare = minimizePhoneNumber(data.second);
-                } else if (data.second == QString()) {
-                    // Compare this email address in lowercased form
-                    data.compare = data.first.toLower();
-                } else {
-                    // Compare this account URI in lowercased form
-                    data.compare = data.second.toLower();
-                }
-
-                m_unknownAddresses.append(data);
-            }
-            data.listener->addressResolved(data.first, data.second, item);
-            m_resolveAddresses.erase(it);
-            return;
-        }
+    QHash<QContactFetchRequest *, ResolveData>::iterator it = instancePtr->m_resolveAddresses.find(request);
+    if (it == instancePtr->m_resolveAddresses.end()) {
+        qWarning() << "Got stateChanged for unknown request";
+        return;
     }
+
+    ResolveData data(it.value());
+    if (data.first == QString()) {
+        // We have now queried this phone number
+        m_resolvedPhoneNumbers.insert(minimizePhoneNumber(data.second));
+    }
+
+    CacheItem *item = 0;
+    const QList<QContact> &resolvedContacts = it.key()->contacts();
+
+    if (!resolvedContacts.isEmpty()) {
+        if (resolvedContacts.count() == 1) {
+            item = itemById(apiId(resolvedContacts.first()), false);
+        } else {
+            // Lookup the result in our updated indexes
+            if (data.first == QString()) {
+                item = itemByPhoneNumber(data.second, false);
+            } else if (data.second == QString()) {
+                item = itemByEmailAddress(data.first, false);
+            } else {
+                item = itemByOnlineAccount(data.first, data.second, false);
+            }
+        }
+    } else {
+        // This address is unknown - keep it for later resolution
+        if (data.first == QString()) {
+            // Compare this phone number in minimized form
+            data.compare = minimizePhoneNumber(data.second);
+        } else if (data.second == QString()) {
+            // Compare this email address in lowercased form
+            data.compare = data.first.toLower();
+        } else {
+            // Compare this account URI in lowercased form
+            data.compare = data.second.toLower();
+        }
+
+        m_unknownAddresses.append(data);
+    }
+    data.listener->addressResolved(data.first, data.second, item);
+    delete it.key();
+    m_resolveAddresses.erase(it);
 }
 
 void SeasideCache::makePopulated(FilterType filter)
@@ -3080,7 +3077,6 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
     data.second = second;
     data.requireComplete = requireComplete;
     data.listener = listener;
-    data.fetchRequest = 0;
 
     // Is this address a known-unknown?
     bool knownUnknown = false;
@@ -3098,7 +3094,6 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
     } else {
         QContactFetchRequest *request = new QContactFetchRequest(this);
         request->setManager(manager());
-        data.fetchRequest = request;
 
         if (first.isEmpty()) {
             // Search for phone number
@@ -3130,7 +3125,7 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
         request->setFetchHint(requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes | m_extraFetchTypes));
         connect(request, SIGNAL(stateChanged(QContactAbstractRequest::State)),
             this, SLOT(addressRequestStateChanged(QContactAbstractRequest::State)));
-        m_resolveAddresses.append(data);
+        m_resolveAddresses[request] = data;
         request->start();
     }
 }
