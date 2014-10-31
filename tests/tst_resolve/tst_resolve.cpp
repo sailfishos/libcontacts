@@ -32,6 +32,7 @@
 
 #include <QObject>
 #include <QtTest>
+#include <QtDebug>
 
 #include <QContact>
 #include <QContactEmailAddress>
@@ -142,7 +143,7 @@ void tst_Resolve::makeContacts()
     QVERIFY(makeContact("Berta", "Berenstain", "", "berta.b@geemail.com", "berta.b@geemail.com"));
     QVERIFY(makeContact("Carlo", "Rizzi", "+358471112222", "", ""));
     QVERIFY(makeContact("Daffy", "Duck", "+358470009955", "daffyd@example.com", ""));
-    QVERIFY(makeContact("Daffy", "Duck", "", "daffy.d@example.com", ""));
+    QVERIFY(makeContact("Dafferd", "Duck", "", "daffy.d@example.com", ""));
     QVERIFY(makeContact("Ernest", "Everest", "+358477758885", "", ""));
 }
 
@@ -239,6 +240,31 @@ void tst_Resolve::resolveByAccountNotFound()
     QCOMPARE(item, (SeasideCache::CacheItem *)0);
 }
 
+struct ItemWatcher : public SeasideCache::ItemData {
+    QList<int> m_constituents;
+    bool m_aggregationComplete;
+
+    ItemWatcher() : m_aggregationComplete(false)
+    { }
+
+    virtual void displayLabelOrderChanged(SeasideCache::DisplayLabelOrder)
+    { }
+    virtual void updateContact(const QtContacts::QContact&, QtContacts::QContact*, SeasideCache::ContactState)
+    { }
+    virtual void mergeCandidatesFetched(const QList<int> &)
+    { }
+
+    virtual void aggregationOperationCompleted()
+    { m_aggregationComplete = true; }
+
+    virtual void constituentsFetched(const QList<int> &ids)
+    { m_constituents = ids; }
+
+    virtual QList<int> constituents() const
+    { return m_constituents; }
+};
+
+// Test that address resolutions don't interfere with contact linking
 void tst_Resolve::resolveDuringContactLink()
 {
     SeasideCache::CacheItem *item1;
@@ -254,14 +280,21 @@ void tst_Resolve::resolveDuringContactLink()
         QTRY_VERIFY(listener1.m_resolved);
         item1 = listener1.m_item;
     }
+    QVERIFY(item1);
+    QCOMPARE(item1->displayLabel, QString::fromLatin1("Daffy Duck"));
     if (!item2) {
         QTRY_VERIFY(listener2.m_resolved);
         item2 = listener2.m_item;
     }
+    QVERIFY(item2);
+    QCOMPARE(item2->displayLabel, QString::fromLatin1("Dafferd Duck"));
 
+    int iid = item1->iid;
+    item1->itemData = new ItemWatcher;
+    item2->itemData = new ItemWatcher;
     SeasideCache::aggregateContacts(item1->contact, item2->contact);
 
-    // Now see if an address resolution goes right during aggregation
+    // Fire off an address resolution simultaneously
     SeasideCache::CacheItem *item;
     QString number("+358477758885");
     TestResolveListener listener;
@@ -272,8 +305,33 @@ void tst_Resolve::resolveDuringContactLink()
         item = listener.m_item;
     }
 
-    QContactName name = item->contact.detail<QContactName>();
-    QCOMPARE(name.firstName(), QString::fromLatin1("Ernest"));
+    // Did the address resolution go ok?
+    QCOMPARE(item->displayLabel, QString::fromLatin1("Ernest Everest"));
+
+    // wait for the aggregation
+    item1 = SeasideCache::existingItem(iid);
+    QVERIFY(item1);
+    QVERIFY(item1->itemData);
+    QTRY_VERIFY(((ItemWatcher *) item1->itemData)->m_aggregationComplete);
+
+    // the aggregate's constituents are not updated in the cache, so they
+    // have to be reloaded before comparing. Is that a bug?
+    SeasideCache::fetchConstituents(item1->contact);
+    QTRY_COMPARE(item1->itemData->constituents().count(), 2);
+
+    // Check that the expected two contacts are the constituents.
+    int iid1 = item1->itemData->constituents()[0];
+    int iid2 = item1->itemData->constituents()[1];
+    item1 = SeasideCache::itemById(iid1);
+    item2 = SeasideCache::itemById(iid2);
+    QTRY_COMPARE(item1->contactState, SeasideCache::ContactComplete);
+    QTRY_COMPARE(item2->contactState, SeasideCache::ContactComplete);
+
+    QStringList names, expected;
+    names << item1->displayLabel << item2->displayLabel;
+    qSort(names);
+    expected << QString::fromLatin1("Dafferd Duck") << QString::fromLatin1("Daffy Duck");
+    QCOMPARE(names, expected);
 }
 
 #include "tst_resolve.moc"
