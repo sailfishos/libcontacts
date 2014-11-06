@@ -10,6 +10,9 @@
            <case manual="false" name="seasideimport">
                <step>/opt/tests/@PACKAGENAME@/tst_seasideimport</step>
            </case>
+           <case manual="false" name="resolve">
+               <step>/opt/tests/@PACKAGENAME@/tst_resolve</step>
+           </case>
        </set>
    </suite>
 </testdefinition>
