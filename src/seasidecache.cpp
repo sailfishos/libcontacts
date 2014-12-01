@@ -1420,6 +1420,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
             m_fetchRequest.setFilter(favoriteFilter());
             m_fetchRequest.setFetchHint(favoriteFetchHint(m_fetchTypes));
             m_fetchRequest.setSorting(m_sortOrder);
+            qDebug() << "Starting favorites query at" << m_timer.elapsed() << "ms";
             m_fetchRequest.start();
 
             m_fetchProcessedCount = 0;
@@ -1464,6 +1465,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchRequest.setFilter(allFilter());
                 m_fetchRequest.setFetchHint(metadataFetchHint(m_fetchTypes));
                 m_fetchRequest.setSorting(m_sortOrder);
+                qDebug() << "Starting metadata query at" << m_timer.elapsed() << "ms";
                 m_fetchRequest.start();
 
                 m_fetchProcessedCount = 0;
@@ -1473,6 +1475,7 @@ void SeasideCache::startRequest(bool *idleProcessing)
                 m_fetchRequest.setFilter(onlineFilter());
                 m_fetchRequest.setFetchHint(onlineFetchHint(m_fetchTypes | SeasideCache::FetchAccountUri));
                 m_fetchRequest.setSorting(m_onlineSortOrder);
+                qDebug() << "Starting online  query at" << m_timer.elapsed() << "ms";
                 m_fetchRequest.start();
 
                 m_fetchProcessedCount = 0;
