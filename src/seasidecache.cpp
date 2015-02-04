@@ -691,6 +691,15 @@ void SeasideCache::unregisterResolveListener(ResolveListener *listener)
             ++it3;
         }
     }
+
+    QSet<ResolveData>::iterator it4 = instancePtr->m_pendingResolve.begin();
+    while (it4 != instancePtr->m_pendingResolve.end()) {
+        if (it4->listener == listener) {
+            it4 = instancePtr->m_pendingResolve.erase(it4);
+        } else {
+            ++it4;
+        }
+    }
 }
 
 void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
@@ -2719,6 +2728,7 @@ void SeasideCache::addressRequestStateChanged(QContactAbstractRequest::State sta
     }
     data.listener->addressResolved(data.first, data.second, item);
     delete it.key();
+    m_pendingResolve.remove(data);
     m_resolveAddresses.erase(it);
 }
 
@@ -3090,6 +3100,10 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
     data.requireComplete = requireComplete;
     data.listener = listener;
 
+    // filter out duplicate requests
+    if (m_pendingResolve.find(data) != m_pendingResolve.end())
+        return;
+
     // Is this address a known-unknown?
     bool knownUnknown = false;
     QList<ResolveData>::const_iterator it = instancePtr->m_unknownAddresses.constBegin(), end = m_unknownAddresses.constEnd();
@@ -3138,6 +3152,7 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
         connect(request, SIGNAL(stateChanged(QContactAbstractRequest::State)),
             this, SLOT(addressRequestStateChanged(QContactAbstractRequest::State)));
         m_resolveAddresses[request] = data;
+        m_pendingResolve.insert(data);
         request->start();
     }
 }
@@ -3203,6 +3218,28 @@ QContactRelationship SeasideCache::makeRelationship(const QString &type, const Q
 QContactRelationship SeasideCache::makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2)
 {
     return makeRelationship(type, contact1.id(), contact2.id());
+}
+
+bool operator==(const SeasideCache::ResolveData &lhs, const SeasideCache::ResolveData &rhs)
+{
+    // .listener and .requireComplete first because they are the cheapest comparisons
+    // then .second before .first because .second is most likely to be unequal
+    // .compare is derived from first and second so it does not need to be checked
+    return lhs.listener == rhs.listener
+        && lhs.requireComplete == rhs.requireComplete
+        && lhs.second == rhs.second
+        && lhs.first == rhs.first;
+}
+
+uint qHash(const SeasideCache::ResolveData &key, uint seed)
+{
+    uint h1 = qHash(key.first, seed);
+    uint h2 = qHash(key.second, seed);
+    uint h3 = key.requireComplete;
+    uint h4 = qHash(key.listener, seed);
+
+    // Don't xor with seed here because h4 already did that
+    return h1 ^ h2 ^ h3 ^ h4;
 }
 
 // Instantiate the contact ID functions for qtcontacts-sqlite
