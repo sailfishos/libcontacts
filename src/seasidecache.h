@@ -52,6 +52,7 @@
 #include <QContactIdFetchRequest>
 
 #include <QBasicTimer>
+#include <QHash>
 #include <QSet>
 
 #include <QElapsedTimer>
@@ -469,11 +470,12 @@ private:
     struct ResolveData {
         QString first;
         QString second;
-        QString compare;
+        QString compare; // only used in m_unknownAddresses
         bool requireComplete;
         ResolveListener *listener;
     };
     QHash<QContactFetchRequest *, ResolveData> m_resolveAddresses;
+    QSet<ResolveData> m_pendingResolve; // these have active requests already
     QList<ResolveData> m_unknownResolveAddresses;
     QList<ResolveData> m_unknownAddresses;
     QSet<QString> m_resolvedPhoneNumbers;
@@ -484,6 +486,12 @@ private:
     static SeasideCache *instancePtr;
     static int contactNameGroupCount;
     static QStringList allContactNameGroups;
+
+    friend bool operator==(const SeasideCache::ResolveData &lhs, const SeasideCache::ResolveData &rhs);
+    friend uint qHash(const SeasideCache::ResolveData &key, uint seed);
 };
+
+bool operator==(const SeasideCache::ResolveData &lhs, const SeasideCache::ResolveData &rhs);
+uint qHash(const SeasideCache::ResolveData &key, uint seed = 0);
 
 #endif
