@@ -682,6 +682,15 @@ void SeasideCache::unregisterResolveListener(ResolveListener *listener)
             ++it2;
         }
     }
+
+    QList<ResolveData>::iterator it3 = instancePtr->m_unknownResolveAddresses.begin();
+    while (it3 != instancePtr->m_unknownResolveAddresses.end()) {
+        if (it3->listener == listener) {
+            it3 = instancePtr->m_unknownResolveAddresses.erase(it3);
+        } else {
+            ++it3;
+        }
+    }
 }
 
 void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
