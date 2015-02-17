@@ -46,6 +46,8 @@
 #include <QVersitDocument>
 #include <QVersitProperty>
 
+#include <QContactAvatar>
+
 QTCONTACTS_USE_NAMESPACE
 QTVERSIT_USE_NAMESPACE
 
@@ -79,6 +81,8 @@ public:
     void contactProcessed(const QContact &, QVersitDocument *);
     void detailProcessed(const QContact &, const QContactDetail &detail,
                          const QVersitDocument &, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded);
+
+    static QContactAvatar avatarFromPhotoProperty(const QVersitProperty &property);
 
 private:
     SeasidePropertyHandlerPrivate *priv;
