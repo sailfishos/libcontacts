@@ -37,6 +37,7 @@
 
 #include <QString>
 #include <QByteArray>
+#include <QVariantMap>
 
 #include <QContact>
 
@@ -62,10 +63,11 @@ QTVERSIT_USE_NAMESPACE
     Also support the X-NEMOMOBILE-ONLINEACCOUNT-DEMO property
     for loading demo online account data.
 */
+class SeasidePropertyHandlerPrivate;
 class CONTACTCACHE_EXPORT SeasidePropertyHandler : public QVersitContactHandler
 {
 public:
-    SeasidePropertyHandler();
+    SeasidePropertyHandler(const QSet<QContactDetail::DetailType> &nonexportableDetails = QSet<QContactDetail::DetailType>());
     ~SeasidePropertyHandler();
 
     // QVersitContactImporterPropertyHandlerV2
@@ -77,6 +79,9 @@ public:
     void contactProcessed(const QContact &, QVersitDocument *);
     void detailProcessed(const QContact &, const QContactDetail &detail,
                          const QVersitDocument &, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded);
+
+private:
+    SeasidePropertyHandlerPrivate *priv;
 };
 
 #endif // PROPERTYHANDLER_H

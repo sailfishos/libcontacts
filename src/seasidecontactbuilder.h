@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013 Jolla Mobile <matthew.vogt@jollamobile.com>
+ * Copyright (C) 2015 Jolla Mobile
+ * Contact: Chris Adams <chris.adams@jollamobile.com>
  *
  * You may use this file under the terms of the BSD license as follows:
  *
@@ -29,25 +30,64 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
  */
 
-#ifndef SEASIDEIMPORT_H
-#define SEASIDEIMPORT_H
+#ifndef SEASIDECONTACTBUILDER_H
+#define SEASIDECONTACTBUILDER_H
 
 #include "contactcacheexport.h"
-#include "seasidecontactbuilder.h"
 
 #include <QContact>
+#include <QContactManager>
 #include <QVersitDocument>
+#include <QVersitContactHandler>
+
+#include <QList>
 
 QTCONTACTS_USE_NAMESPACE
 QTVERSIT_USE_NAMESPACE
 
-class CONTACTCACHE_EXPORT SeasideImport
+class CONTACTCACHE_EXPORT SeasideContactBuilderPrivate
 {
-    SeasideImport();
-    ~SeasideImport();
-
 public:
-    static QList<QContact> buildImportContacts(const QList<QVersitDocument> &details, int *newCount = 0, int *updatedCount = 0, int *ignoredCount = 0, SeasideContactBuilder *builder = 0);
+    QContactManager *manager;
+    QVersitContactHandler *propertyHandler;
+
+    QSet<QContactDetail::DetailType> unimportableDetailTypes;
+    QStringList importableSyncTargets;
+
+    QHash<QString, int> importGuids;
+    QHash<QString, int> importNames;
+    QHash<QString, int> importLabels;
+
+    QHash<QString, QContactId> existingGuids;
+    QHash<QString, QContactId> existingNames;
+    QMap<QContactId, QString> existingContactNames;
+    QHash<QString, QContactId> existingNicknames;
+
+    QVariantMap extraData; // anything the derived type wants to store.
+};
+
+class CONTACTCACHE_EXPORT SeasideContactBuilder
+{
+public:
+    SeasideContactBuilder();
+    virtual ~SeasideContactBuilder();
+
+    virtual QVersitContactHandler *propertyHandler();
+    virtual QContactManager *manager();
+    virtual QContactFilter mergeSubsetFilter() const;
+
+    virtual bool mergeLocalIntoImport(QContact &import, const QContact &local, bool *erase);
+    virtual bool mergeImportIntoImport(QContact &import, QContact &otherImport, bool *erase);
+
+    virtual QList<QContact> importContacts(const QList<QVersitDocument> &documents);
+    virtual void preprocessContact(QContact &contact);
+    virtual int previousDuplicateIndex(QList<QContact> &importedContacts, int contactIndex);
+    virtual void buildLocalDeviceContactIndexes();
+    virtual QContactId matchingLocalContactId(QContact &contact);
+
+
+protected:
+    SeasideContactBuilderPrivate *d;
 };
 
 #endif

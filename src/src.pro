@@ -38,6 +38,7 @@ SOURCES += \
     $$PWD/seasidecache.cpp \
     $$PWD/seasideexport.cpp \
     $$PWD/seasideimport.cpp \
+    $$PWD/seasidecontactbuilder.cpp \
     $$PWD/seasidepropertyhandler.cpp
 
 HEADERS += \
@@ -46,6 +47,7 @@ HEADERS += \
     $$PWD/seasidecache.h \
     $$PWD/seasideexport.h \
     $$PWD/seasideimport.h \
+    $$PWD/seasidecontactbuilder.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
     $$PWD/seasidepropertyhandler.h
@@ -56,6 +58,7 @@ headers.files = \
     $$PWD/seasidecache.h \
     $$PWD/seasideexport.h \
     $$PWD/seasideimport.h \
+    $$PWD/seasidecontactbuilder.h \
     $$PWD/synchronizelists.h \
     $$PWD/seasidenamegrouper.h \
     $$PWD/seasidepropertyhandler.h

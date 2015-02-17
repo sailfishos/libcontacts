@@ -223,14 +223,32 @@ void processSyncTarget(const QContactSyncTarget &detail, QSet<int> * processedFi
     }
 }
 
+void ignoreDetail(const QContactSyncTarget &detail, QSet<int> * processedFields, QList<QVersitProperty> * toBeRemoved, QList<QVersitProperty> * toBeAdded)
+{
+    Q_UNUSED(detail)
+    Q_UNUSED(processedFields)
+    toBeAdded->clear();
+    toBeRemoved->clear();
 }
 
-SeasidePropertyHandler::SeasidePropertyHandler()
+}
+
+class SeasidePropertyHandlerPrivate
 {
+public:
+    QSet<QContactDetail::DetailType> m_nonexportableDetails;
+};
+
+SeasidePropertyHandler::SeasidePropertyHandler(const QSet<QContactDetail::DetailType> &nonexportableDetails)
+    : QVersitContactHandler()
+    , priv(new SeasidePropertyHandlerPrivate)
+{
+    priv->m_nonexportableDetails = nonexportableDetails;
 }
 
 SeasidePropertyHandler::~SeasidePropertyHandler()
 {
+    delete priv;
 }
 
 void SeasidePropertyHandler::documentProcessed(const QVersitDocument &, QContact *)
@@ -252,7 +270,7 @@ void SeasidePropertyHandler::propertyProcessed(const QVersitDocument &, const QV
     }
 }
 
-void SeasidePropertyHandler::contactProcessed(const QContact &c, QVersitDocument *)
+void SeasidePropertyHandler::contactProcessed(const QContact &, QVersitDocument *)
 {
 }
 
@@ -261,7 +279,9 @@ void SeasidePropertyHandler::detailProcessed(const QContact &, const QContactDet
 {
     const QContactDetail::DetailType detailType(detail.type());
 
-    if (detailType == QContactSyncTarget::Type) {
+    if (priv->m_nonexportableDetails.contains(detailType)) {
+        ignoreDetail(static_cast<const QContactSyncTarget &>(detail), processedFields, toBeRemoved, toBeAdded);
+    } else if (detailType == QContactSyncTarget::Type) {
         processSyncTarget(static_cast<const QContactSyncTarget &>(detail), processedFields, toBeRemoved, toBeAdded);
     }
 }
