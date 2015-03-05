@@ -99,6 +99,67 @@ QStringList getAllContactNameGroups()
     return groups;
 }
 
+// Find the script that all letters in the name belong to, else yield Unknown
+QChar::Script nameScript(const QString &name)
+{
+    QChar::Script script(QChar::Script_Unknown);
+
+    if (!name.isEmpty()) {
+        QString::const_iterator it = name.begin(), end = name.end();
+        for ( ; it != end; ++it) {
+            const QChar::Category charCategory((*it).category());
+            if (charCategory >= QChar::Letter_Uppercase && charCategory <= QChar::Letter_Other) {
+                const QChar::Script charScript((*it).script());
+                if (script == QChar::Script_Unknown) {
+                    script = charScript;
+                } else if (charScript != script) {
+                    return QChar::Script_Unknown;
+                }
+            }
+        }
+    }
+
+    return script;
+}
+
+QChar::Script nameScript(const QString &firstName, const QString &lastName)
+{
+    if (firstName.isEmpty()) {
+        return nameScript(lastName);
+    } else if (lastName.isEmpty()) {
+        return nameScript(firstName);
+    }
+
+    QChar::Script firstScript(nameScript(firstName));
+    if (firstScript != QChar::Script_Unknown) {
+        QChar::Script lastScript(nameScript(lastName));
+        if (lastScript == firstScript) {
+            return lastScript;
+        }
+    }
+
+    return QChar::Script_Unknown;
+}
+
+bool nameScriptImpliesFamilyFirst(const QString &firstName, const QString &lastName)
+{
+    switch (nameScript(firstName, lastName)) {
+        // These scripts are used by cultures that conform to the family-name-first nameing convention:
+        case QChar::Script_Han:
+        case QChar::Script_Lao:
+        case QChar::Script_Hangul:
+        case QChar::Script_Khmer:
+        case QChar::Script_Mongolian:
+        case QChar::Script_Hiragana:
+        case QChar::Script_Katakana:
+        case QChar::Script_Bopomofo:
+        case QChar::Script_Yi:
+            return true;
+        default:
+            return false;
+    }
+}
+
 QString managerName()
 {
     return QString::fromLatin1("org.nemomobile.contacts.sqlite");
@@ -1085,6 +1146,24 @@ bool SeasideCache::isPopulated(FilterType filterType)
     return instancePtr->m_populated & (1 << filterType);
 }
 
+QString SeasideCache::primaryName(const QString &firstName, const QString &lastName)
+{
+    if (firstName.isEmpty() && lastName.isEmpty()) {
+        return QString();
+    }
+
+    const bool familyNameFirst(displayLabelOrder() == LastNameFirst ||
+                               nameScriptImpliesFamilyFirst(firstName, lastName));
+    return familyNameFirst ? lastName : firstName;
+}
+
+QString SeasideCache::secondaryName(const QString &firstName, const QString &lastName)
+{
+    const bool familyNameFirst(displayLabelOrder() == LastNameFirst ||
+                               nameScriptImpliesFamilyFirst(firstName, lastName));
+    return familyNameFirst ? firstName : lastName;
+}
+
 static bool needsSpaceBetweenNames(const QString &first, const QString &second)
 {
     if (first.isEmpty() || second.isEmpty()) {
@@ -1101,14 +1180,13 @@ QString SeasideCache::generateDisplayLabel(const QContact &contact, DisplayLabel
 
     QString displayLabel;
 
-    QString nameStr1;
-    QString nameStr2;
-    if (order == LastNameFirst) {
+    QString nameStr1(name.firstName());
+    QString nameStr2(name.lastName());
+
+    const bool familyNameFirst(order == LastNameFirst || nameScriptImpliesFamilyFirst(nameStr1, nameStr2));
+    if (familyNameFirst) {
         nameStr1 = name.lastName();
         nameStr2 = name.firstName();
-    } else {
-        nameStr1 = name.firstName();
-        nameStr2 = name.lastName();
     }
 
     if (!nameStr1.isEmpty())
