@@ -44,7 +44,7 @@
 
 namespace {
 
-void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+QContactAvatar avatarFromPhotoProperty(const QVersitProperty &property)
 {
     // if the property is a PHOTO property, store the data to disk
     // and then create an avatar detail which points to it.
@@ -61,11 +61,9 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
         if (!url.scheme().isEmpty() && !url.isLocalFile()) {
             QContactAvatar newAvatar;
             newAvatar.setImageUrl(url);
-            updatedDetails->append(newAvatar);
 
             // we have successfully processed this PHOTO property.
-            *alreadyProcessed = true;
-            return;
+            return newAvatar;
         }
     }
 
@@ -83,7 +81,7 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
             QFile file(filePath);
             if (!file.open(QIODevice::ReadOnly)) {
                 qWarning() << "Unable to process photo data as file:" << path;
-                return;
+                return QContactAvatar();
             } else {
                 photoData = file.readAll();
             }
@@ -95,7 +93,7 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
         photoData = property.variantValue().toByteArray();
         if (photoData.isEmpty()) {
             qWarning() << "Failed to extract avatar data from vCard PHOTO property";
-            return;
+            return QContactAvatar();
         }
     }
 
@@ -103,7 +101,7 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
     bool loaded = img.loadFromData(photoData);
     if (!loaded) {
         qWarning() << "Failed to load avatar image from vCard PHOTO data";
-        return;
+        return QContactAvatar();
     }
 
     // We will save the avatar image to disk in the system's data location
@@ -115,7 +113,7 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
     QDir photoDir;
     if (!photoDir.mkpath(photoDirPath)) {
         qWarning() << "Failed to create avatar image directory when loading avatar image from vCard PHOTO data";
-        return;
+        return QContactAvatar();
     }
 
     // construct the filename of the new avatar image.
@@ -126,7 +124,7 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
     bool saved = img.save(photoFilePath);
     if (!saved) {
         qWarning() << "Failed to save avatar image from vCard PHOTO data to" << photoFilePath;
-        return;
+        return QContactAvatar();
     }
 
     qWarning() << "Successfully saved avatar image from vCard PHOTO data to" << photoFilePath;
@@ -134,10 +132,18 @@ void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList
     // save the avatar detail - TODO: mark the avatar as "owned by the contact" (remove on delete)
     QContactAvatar newAvatar;
     newAvatar.setImageUrl(QUrl::fromLocalFile(photoFilePath));
-    updatedDetails->append(newAvatar);
 
     // we have successfully processed this PHOTO property.
-    *alreadyProcessed = true;
+    return newAvatar;
+}
+
+void processPhoto(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
+{
+    QContactAvatar newAvatar = avatarFromPhotoProperty(property);
+    if (!newAvatar.isEmpty()) {
+        updatedDetails->append(newAvatar);
+        *alreadyProcessed = true;
+    }
 }
 
 void processOnlineAccount(const QVersitProperty &property, bool *alreadyProcessed, QList<QContactDetail> * updatedDetails)
@@ -286,3 +292,7 @@ void SeasidePropertyHandler::detailProcessed(const QContact &, const QContactDet
     }
 }
 
+QContactAvatar SeasidePropertyHandler::avatarFromPhotoProperty(const QVersitProperty &property)
+{
+    return ::avatarFromPhotoProperty(property);
+}
