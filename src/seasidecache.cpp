@@ -170,6 +170,9 @@ QMap<QString, QString> managerParameters()
     QMap<QString, QString> rv;
     // Report presence changes independently from other contact changes
     rv.insert(QString::fromLatin1("mergePresenceChanges"), QString::fromLatin1("false"));
+    if (!qgetenv("LIBCONTACTS_TEST_MODE").isEmpty()) {
+        rv.insert(QString::fromLatin1("autoTest"), QString::fromLatin1("true"));
+    }
     return rv;
 }
 

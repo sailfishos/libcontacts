@@ -2,6 +2,7 @@ include(../package.pri)
 
 TEMPLATE = subdirs
 SUBDIRS = tst_synchronizelists tst_seasideimport tst_resolve
+OTHER_FILES += tests.xml.in
 
 tests_xml.target = tests.xml
 tests_xml.depends = $$PWD/tests.xml.in

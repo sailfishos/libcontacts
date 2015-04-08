@@ -22,6 +22,7 @@ BuildRequires:  pkgconfig(qtcontacts-sqlite-qt5-extensions) >= 0.2.1
 %package tests
 Summary:    Nemo contact cache library tests
 Group:      System/Libraries
+Requires:   blts-tools
 Requires:   %{name} = %{version}-%{release}
 
 %description tests
