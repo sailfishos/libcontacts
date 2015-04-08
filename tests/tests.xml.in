@@ -5,13 +5,13 @@
        <set name="contactcache-test0" feature="Contacts">
            <description>Contact cache automatic tests</description>
            <case manual="false" name="synchronizelists">
-               <step>/opt/tests/@PACKAGENAME@/tst_synchronizelists</step>
+               <step>LIBCONTACTS_TEST_MODE=1 /usr/sbin/run-blts-root /bin/su -g privileged -c '/opt/tests/@PACKAGENAME@/tst_synchronizelists' nemo</step>
            </case>
            <case manual="false" name="seasideimport">
-               <step>/opt/tests/@PACKAGENAME@/tst_seasideimport</step>
+               <step>LIBCONTACTS_TEST_MODE=1 /usr/sbin/run-blts-root /bin/su -g privileged -c '/opt/tests/@PACKAGENAME@/tst_seasideimport' nemo</step>
            </case>
            <case manual="false" name="resolve">
-               <step>/opt/tests/@PACKAGENAME@/tst_resolve</step>
+               <step>LIBCONTACTS_TEST_MODE=1 /usr/sbin/run-blts-root /bin/su -g privileged -c '/opt/tests/@PACKAGENAME@/tst_resolve' nemo</step>
            </case>
        </set>
    </suite>
