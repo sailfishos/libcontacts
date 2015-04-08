@@ -468,10 +468,15 @@ void tst_SeasideImport::mergedUid()
     QCOMPARE(name.isEmpty(), true);
 
     const QList<QContactNickname> nicknames(c.details<QContactNickname>());
-    QCOMPARE(nicknames.count(), 1);
+    QCOMPARE(nicknames.count(), 2);
 
-    const QContactNickname nick(nicknames.at(0));
-    QCOMPARE(nick.nickname(), QString::fromLatin1("Jebediah Springfield"));
+    const QContactNickname nick1(nicknames.at(0));
+    const QContactNickname nick2(nicknames.at(1));
+    QVERIFY(nick1.nickname() == QString::fromLatin1("Jebediah Springfield")
+            || nick1.nickname() == QString::fromLatin1("Obadiah Springfield"));
+    QVERIFY(nick2.nickname() == QString::fromLatin1("Jebediah Springfield")
+            || nick2.nickname() == QString::fromLatin1("Obadiah Springfield"));
+    QVERIFY(nick1.nickname() != nick2.nickname());
 
     const QList<QContactPhoneNumber> phoneNumbers(c.details<QContactPhoneNumber>());
     QCOMPARE(phoneNumbers.count(), 2);
@@ -494,4 +499,4 @@ void tst_SeasideImport::mergedUid()
 }
 
 #include "tst_seasideimport.moc"
-QTEST_APPLESS_MAIN(tst_SeasideImport)
+QTEST_GUILESS_MAIN(tst_SeasideImport)
