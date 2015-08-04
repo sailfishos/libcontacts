@@ -140,7 +140,7 @@ public:
 
     struct CacheItem
     {
-        CacheItem() : itemData(0), iid(0), contactState(ContactAbsent), listeners(0) {}
+        CacheItem() : itemData(0), iid(0), statusFlags(0), contactState(ContactAbsent), listeners(0) {}
         CacheItem(const QContact &contact)
             : contact(contact), itemData(0), iid(internalId(contact)),
               statusFlags(contact.detail<QContactStatusFlags>().flagsValue()), contactState(ContactAbsent), listeners(0) {}
