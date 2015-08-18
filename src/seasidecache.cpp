@@ -3227,9 +3227,9 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
             request->setFilter(localFilter & remoteFilter);
         }
 
-        // If completion is not required, we need to at least retrieve as much detail
-        // as the favorites store, so we don't update any favorite with a smaller data subset
-        request->setFetchHint(requireComplete ? basicFetchHint() : favoriteFetchHint(m_fetchTypes | m_extraFetchTypes));
+        // If completion is not required, at least include the contact endpoint details (since resolving is obviously being used)
+        const quint32 detailFetchTypes(SeasideCache::FetchAccountUri | SeasideCache::FetchPhoneNumber | SeasideCache::FetchEmailAddress);
+        request->setFetchHint(requireComplete ? basicFetchHint() : onlineFetchHint(m_fetchTypes | m_extraFetchTypes | detailFetchTypes));
         connect(request, SIGNAL(stateChanged(QContactAbstractRequest::State)),
             this, SLOT(addressRequestStateChanged(QContactAbstractRequest::State)));
         m_resolveAddresses[request] = data;
