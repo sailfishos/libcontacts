@@ -1001,7 +1001,11 @@ SeasideCache::CacheItem *SeasideCache::resolvePhoneNumber(ResolveListener *liste
 {
     CacheItem *item = itemByPhoneNumber(number, requireComplete);
     if (!item) {
-        instancePtr->resolveAddress(listener, QString(), number, requireComplete);
+        // Don't bother trying to resolve an invalid number
+        const QString normalized(normalizePhoneNumber(number));
+        if (!normalized.isEmpty()) {
+            instancePtr->resolveAddress(listener, QString(), number, requireComplete);
+        }
     } else if (requireComplete) {
         ensureCompletion(item);
     }
