@@ -1923,7 +1923,9 @@ void SeasideCache::timerEvent(QTimerEvent *event)
 
 void SeasideCache::contactsAdded(const QList<QContactId> &ids)
 {
-    if (m_keepPopulated) {
+    // These additions may change address resolutions, so we may need to process them
+    const bool relevant(m_keepPopulated || !instancePtr->m_changeListeners.isEmpty());
+    if (relevant) {
         updateContacts(ids, &m_changedContacts);
     }
 }
