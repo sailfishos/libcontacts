@@ -2173,7 +2173,8 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
                     resolveUnknownAddresses(address.first, address.second, item);
                 }
 
-                m_phoneNumberIds.insert(address.second, iid);
+                if (!m_phoneNumberIds.contains(address.second, iid))
+                    m_phoneNumberIds.insert(address.second, iid);
             }
         }
 
