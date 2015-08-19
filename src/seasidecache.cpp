@@ -575,9 +575,13 @@ SeasideCache::SeasideCache()
     connect(config, SIGNAL(sortPropertyChanged(QString)), this, SLOT(sortPropertyChanged(QString)));
     connect(config, SIGNAL(groupPropertyChanged(QString)), this, SLOT(groupPropertyChanged(QString)));
 
-    if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
-                                              MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
-        qWarning() << "Unable to connect to MCE displayStatusChanged signal";
+    // Is this a GUI application?  If so, we want to defer some processing when the display is off
+    if (qApp && qApp->property("applicationDisplayName").isValid()) {
+        // Only QGuiApplication has this property
+        if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
+                                                  MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
+            qWarning() << "Unable to connect to MCE displayStatusChanged signal";
+        }
     }
 
     QContactManager *mgr(manager());
