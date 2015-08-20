@@ -575,9 +575,13 @@ SeasideCache::SeasideCache()
     connect(config, SIGNAL(sortPropertyChanged(QString)), this, SLOT(sortPropertyChanged(QString)));
     connect(config, SIGNAL(groupPropertyChanged(QString)), this, SLOT(groupPropertyChanged(QString)));
 
-    if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
-                                              MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
-        qWarning() << "Unable to connect to MCE displayStatusChanged signal";
+    // Is this a GUI application?  If so, we want to defer some processing when the display is off
+    if (qApp && qApp->property("applicationDisplayName").isValid()) {
+        // Only QGuiApplication has this property
+        if (!QDBusConnection::systemBus().connect(MCE_SERVICE, MCE_SIGNAL_PATH, MCE_SIGNAL_IF,
+                                                  MCE_DISPLAY_SIG, this, SLOT(displayStatusChanged(QString)))) {
+            qWarning() << "Unable to connect to MCE displayStatusChanged signal";
+        }
     }
 
     QContactManager *mgr(manager());
@@ -997,7 +1001,11 @@ SeasideCache::CacheItem *SeasideCache::resolvePhoneNumber(ResolveListener *liste
 {
     CacheItem *item = itemByPhoneNumber(number, requireComplete);
     if (!item) {
-        instancePtr->resolveAddress(listener, QString(), number, requireComplete);
+        // Don't bother trying to resolve an invalid number
+        const QString normalized(normalizePhoneNumber(number));
+        if (!normalized.isEmpty()) {
+            instancePtr->resolveAddress(listener, QString(), number, requireComplete);
+        }
     } else if (requireComplete) {
         ensureCompletion(item);
     }
@@ -1919,7 +1927,9 @@ void SeasideCache::timerEvent(QTimerEvent *event)
 
 void SeasideCache::contactsAdded(const QList<QContactId> &ids)
 {
-    if (m_keepPopulated) {
+    // These additions may change address resolutions, so we may need to process them
+    const bool relevant(m_keepPopulated || !instancePtr->m_changeListeners.isEmpty());
+    if (relevant) {
         updateContacts(ids, &m_changedContacts);
     }
 }
@@ -2163,7 +2173,8 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
                     resolveUnknownAddresses(address.first, address.second, item);
                 }
 
-                m_phoneNumberIds.insert(address.second, iid);
+                if (!m_phoneNumberIds.contains(address.second, iid))
+                    m_phoneNumberIds.insert(address.second, iid);
             }
         }
 
