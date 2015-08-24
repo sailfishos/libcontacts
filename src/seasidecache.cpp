@@ -1005,6 +1005,14 @@ SeasideCache::CacheItem *SeasideCache::resolvePhoneNumber(ResolveListener *liste
         const QString normalized(normalizePhoneNumber(number));
         if (!normalized.isEmpty()) {
             instancePtr->resolveAddress(listener, QString(), number, requireComplete);
+        } else {
+            // Report this address is unknown
+            ResolveData data;
+            data.second = number;
+            data.listener = listener;
+
+            instancePtr->m_unknownResolveAddresses.append(data);
+            instancePtr->requestUpdate();
         }
     } else if (requireComplete) {
         ensureCompletion(item);
