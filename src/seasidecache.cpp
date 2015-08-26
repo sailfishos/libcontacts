@@ -643,7 +643,7 @@ SeasideCache::~SeasideCache()
 
 void SeasideCache::checkForExpiry()
 {
-    if (instancePtr->m_users.isEmpty()) {
+    if (instancePtr->m_users.isEmpty() && !QCoreApplication::closingDown()) {
         bool unused = true;
         for (int i = 0; i < FilterTypesCount; ++i) {
             unused &= instancePtr->m_models[i].isEmpty();
