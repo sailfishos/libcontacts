@@ -15,6 +15,8 @@ BuildRequires:  pkgconfig(mlite5)
 BuildRequires:  pkgconfig(mlocale5)
 BuildRequires:  pkgconfig(mce)
 BuildRequires:  pkgconfig(qtcontacts-sqlite-qt5-extensions) >= 0.2.1
+BuildRequires:  qt5-qttools
+BuildRequires:  qt5-qttools-linguist
 
 %description
 %{summary}.
@@ -36,6 +38,20 @@ Requires:   %{name} = %{version}-%{release}
 %description devel
 %{summary}.
 
+
+%package ts-devel
+Summary: Translation source for libcontacts
+Group: System/Applications
+
+%description ts-devel
+Translation source for libcontacts
+
+%files ts-devel
+%defattr(-,root,root,-)
+%{_datadir}/translations/source/libcontacts.ts
+
+
+
 %prep
 %setup -q -n %{name}-%{version}
 
@@ -47,7 +63,7 @@ make %{?_smp_mflags}
 
 %install
 rm -rf %{buildroot}
-%qmake_install
+%qmake5_install
 
 %post -p /sbin/ldconfig
 
@@ -56,6 +72,7 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %{_libdir}/libcontactcache-qt5.so*
+%{_datadir}/translations/libcontacts_eng_en.qm
 
 %files tests
 %defattr(-,root,root,-)
