@@ -1,0 +1,5 @@
+This library provides a contact cache and various helper functions.
+It should be used in conjunction with nemo-qml-plugin-contacts.
+
+TODO: move this code into the nemo-qml-plugin-contacts repository
+(or vice versa) as the separation between these two is artificial.
