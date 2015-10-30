@@ -50,6 +50,7 @@
 #include <QContactRelationshipRemoveRequest>
 #include <QContactIdFilter>
 #include <QContactIdFetchRequest>
+#include <QContactName>
 
 #include <QBasicTimer>
 #include <QHash>
@@ -323,6 +324,7 @@ public:
     static QString primaryName(const QString &firstName, const QString &lastName);
     static QString secondaryName(const QString &firstName, const QString &lastName);
 
+    static void decomposeDisplayLabel(const QString &formattedDisplayLabel, QContactName *nameDetail);
     static QString generateDisplayLabel(const QContact &contact, DisplayLabelOrder order = FirstNameFirst);
     static QString generateDisplayLabelFromNonNameDetails(const QContact &contact);
     static QUrl filteredAvatarUrl(const QContact &contact, const QStringList &metadataFragments = QStringList());

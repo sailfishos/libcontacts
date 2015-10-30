@@ -1192,6 +1192,67 @@ static bool needsSpaceBetweenNames(const QString &first, const QString &second)
             || second[0].script() != QChar::Script_Han;
 }
 
+template<typename F1, typename F2>
+void updateNameDetail(F1 getter, F2 setter, QContactName *nameDetail, const QString &value)
+{
+    QString existing((nameDetail->*getter)());
+    if (!existing.isEmpty()) {
+        existing.append(QChar::fromLatin1(' '));
+    }
+    (nameDetail->*setter)(existing + value);
+}
+
+void SeasideCache::decomposeDisplayLabel(const QString &formattedDisplayLabel, QContactName *nameDetail)
+{
+    // Try to parse the structure from the formatted name
+    // TODO: Use MBreakIterator for localized splitting
+    QStringList tokens(formattedDisplayLabel.split(QChar::fromLatin1(' '), QString::SkipEmptyParts));
+    if (tokens.count() >= 2) {
+        QString format;
+        if (tokens.count() == 2) {
+            //: Format string for allocating 2 tokens to name parts - 2 characters from the set [FMLPS]
+            //% "FL"
+            format = qtTrId("libcontacts_name_structure_2_tokens");
+        } else if (tokens.count() == 3) {
+            //: Format string for allocating 3 tokens to name parts - 3 characters from the set [FMLPS]
+            //% "FML"
+            format = qtTrId("libcontacts_name_structure_3_tokens");
+        } else if (tokens.count() > 3) {
+            //: Format string for allocating 4 tokens to name parts - 4 characters from the set [FMLPS]
+            //% "FFML"
+            format = qtTrId("libcontacts_name_structure_4_tokens");
+
+            // Coalesce the leading tokens together to limit the possibilities
+            int excess = tokens.count() - 4;
+            if (excess > 0) {
+                QString first(tokens.takeFirst());
+                while (--excess >= 0) {
+                    QString nextNamePart = tokens.takeFirst();
+                    first += (needsSpaceBetweenNames(first, nextNamePart) ? QChar::fromLatin1(' ') : QString()) + nextNamePart;
+                }
+                tokens.prepend(first);
+            }
+        }
+
+        if (format.length() != tokens.length()) {
+            qWarning() << "Invalid structure format for" << tokens.count() << "tokens:" << format;
+        } else {
+            foreach (const QChar &part, format) {
+                const QString token(tokens.takeFirst());
+                switch (part.toUpper().toLatin1()) {
+                    case 'F': updateNameDetail(&QContactName::firstName, &QContactName::setFirstName, nameDetail, token); break;
+                    case 'M': updateNameDetail(&QContactName::middleName, &QContactName::setMiddleName, nameDetail, token); break;
+                    case 'L': updateNameDetail(&QContactName::lastName, &QContactName::setLastName, nameDetail, token); break;
+                    case 'P': updateNameDetail(&QContactName::prefix, &QContactName::setPrefix, nameDetail, token); break;
+                    case 'S': updateNameDetail(&QContactName::suffix, &QContactName::setSuffix, nameDetail, token); break;
+                    default:
+                        qWarning() << "Invalid structure format character:" << part;
+                }
+            }
+        }
+    }
+}
+
 // small helper to avoid inconvenience
 QString SeasideCache::generateDisplayLabel(const QContact &contact, DisplayLabelOrder order)
 {
