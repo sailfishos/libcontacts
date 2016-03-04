@@ -3099,7 +3099,7 @@ QString SeasideCache::exportContacts()
     }
     QFile vcard(baseDir
               + QDir::separator()
-              + QDateTime::currentDateTime().toString("ss_mm_hh_dd_mm_yyyy")
+              + QLocale::c().toString(QDateTime::currentDateTime(), QStringLiteral("ss_mm_hh_dd_mm_yyyy"))
               + ".vcf");
 
     if (!vcard.open(QIODevice::WriteOnly)) {
