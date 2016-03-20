@@ -517,6 +517,9 @@ QContactManager* SeasideCache::manager()
 
 SeasideCache* SeasideCache::instance()
 {
+    if (!instancePtr) {
+        instancePtr = new SeasideCache;
+    }
     return instancePtr;
 }
 
@@ -563,9 +566,6 @@ SeasideCache::SeasideCache()
     , m_contactsUpdated(false)
     , m_displayOff(false)
 {
-    Q_ASSERT(!instancePtr);
-    instancePtr = this;
-
     m_timer.start();
     m_fetchPostponed.invalidate();
 
@@ -656,13 +656,12 @@ void SeasideCache::checkForExpiry()
 
 void SeasideCache::registerModel(ListModel *model, FilterType type, FetchDataType requiredTypes, FetchDataType extraTypes)
 {
-    if (!instancePtr) {
-        new SeasideCache;
-    } else {
-        instancePtr->m_expiryTimer.stop();
-        for (int i = 0; i < FilterTypesCount; ++i)
-            instancePtr->m_models[i].removeAll(model);
-    }
+    // Ensure the cache has been instantiated
+    instance();
+
+    instancePtr->m_expiryTimer.stop();
+    for (int i = 0; i < FilterTypesCount; ++i)
+        instancePtr->m_models[i].removeAll(model);
 
     instancePtr->m_models[type].append(model);
 
@@ -683,11 +682,10 @@ void SeasideCache::unregisterModel(ListModel *model)
 
 void SeasideCache::registerUser(QObject *user)
 {
-    if (!instancePtr) {
-        new SeasideCache;
-    } else {
-        instancePtr->m_expiryTimer.stop();
-    }
+    // Ensure the cache has been instantiated
+    instance();
+
+    instancePtr->m_expiryTimer.stop();
     instancePtr->m_users.insert(user);
 }
 
@@ -700,8 +698,9 @@ void SeasideCache::unregisterUser(QObject *user)
 
 void SeasideCache::registerNameGroupChangeListener(SeasideNameGroupChangeListener *listener)
 {
-    if (!instancePtr)
-        new SeasideCache;
+    // Ensure the cache has been instantiated
+    instance();
+
     instancePtr->m_nameGroupChangeListeners.append(listener);
 }
 
@@ -714,8 +713,9 @@ void SeasideCache::unregisterNameGroupChangeListener(SeasideNameGroupChangeListe
 
 void SeasideCache::registerChangeListener(ChangeListener *listener)
 {
-    if (!instancePtr)
-        new SeasideCache;
+    // Ensure the cache has been instantiated
+    instance();
+
     instancePtr->m_changeListeners.append(listener);
 }
 
@@ -772,8 +772,9 @@ void SeasideCache::unregisterResolveListener(ResolveListener *listener)
 
 void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
 {
-    if (!instancePtr)
-        new SeasideCache;
+    // Ensure the cache has been instantiated
+    instance();
+
     instancePtr->m_nameGrouper.reset(grouper);
 
     allContactNameGroups = instancePtr->m_nameGrouper->allNameGroups();
@@ -841,8 +842,9 @@ QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
 
 QStringList SeasideCache::allNameGroups()
 {
-    if (!instancePtr)
-        new SeasideCache;
+    // Ensure the cache has been instantiated
+    instance();
+
     return allContactNameGroups;
 }
 
@@ -999,6 +1001,9 @@ SeasideCache::CacheItem *SeasideCache::itemByOnlineAccount(const QString &localU
 
 SeasideCache::CacheItem *SeasideCache::resolvePhoneNumber(ResolveListener *listener, const QString &number, bool requireComplete)
 {
+    // Ensure the cache has been instantiated
+    instance();
+
     CacheItem *item = itemByPhoneNumber(number, requireComplete);
     if (!item) {
         // Don't bother trying to resolve an invalid number
@@ -1023,6 +1028,9 @@ SeasideCache::CacheItem *SeasideCache::resolvePhoneNumber(ResolveListener *liste
 
 SeasideCache::CacheItem *SeasideCache::resolveEmailAddress(ResolveListener *listener, const QString &address, bool requireComplete)
 {
+    // Ensure the cache has been instantiated
+    instance();
+
     CacheItem *item = itemByEmailAddress(address, requireComplete);
     if (!item) {
         instancePtr->resolveAddress(listener, address, QString(), requireComplete);
@@ -1034,6 +1042,9 @@ SeasideCache::CacheItem *SeasideCache::resolveEmailAddress(ResolveListener *list
 
 SeasideCache::CacheItem *SeasideCache::resolveOnlineAccount(ResolveListener *listener, const QString &localUid, const QString &remoteUid, bool requireComplete)
 {
+    // Ensure the cache has been instantiated
+    instance();
+
     CacheItem *item = itemByOnlineAccount(localUid, remoteUid, requireComplete);
     if (!item) {
         instancePtr->resolveAddress(listener, localUid, remoteUid, requireComplete);
