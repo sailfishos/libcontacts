@@ -52,6 +52,7 @@
 #include <QContactIdFetchRequest>
 #include <QContactName>
 
+#include <QTranslator>
 #include <QBasicTimer>
 #include <QHash>
 #include <QSet>
@@ -491,6 +492,8 @@ private:
     static SeasideCache *instancePtr;
     static int contactNameGroupCount;
     static QStringList allContactNameGroups;
+    static QTranslator *engEnTranslator;
+    static QTranslator *translator;
 
     friend bool operator==(const SeasideCache::ResolveData &lhs, const SeasideCache::ResolveData &rhs);
     friend uint qHash(const SeasideCache::ResolveData &key, uint seed);
