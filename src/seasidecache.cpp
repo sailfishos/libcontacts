@@ -509,6 +509,8 @@ int bestPhoneNumberMatchLength(const QContact &contact, const QString &match)
 SeasideCache *SeasideCache::instancePtr = 0;
 int SeasideCache::contactNameGroupCount = getContactNameGroupCount();
 QStringList SeasideCache::allContactNameGroups = getAllContactNameGroups();
+QTranslator *SeasideCache::engEnTranslator = 0;
+QTranslator *SeasideCache::translator = 0;
 
 QContactManager* SeasideCache::manager()
 {
@@ -1215,6 +1217,15 @@ void updateNameDetail(F1 getter, F2 setter, QContactName *nameDetail, const QStr
 
 void SeasideCache::decomposeDisplayLabel(const QString &formattedDisplayLabel, QContactName *nameDetail)
 {
+    if (!translator) {
+        engEnTranslator = new QTranslator(qApp);
+        engEnTranslator->load(QString::fromLatin1("libcontacts_eng_en"), QString::fromLatin1("/usr/share/translations"));
+        qApp->installTranslator(engEnTranslator);
+        translator = new QTranslator(qApp);
+        translator->load(QLocale(), QString::fromLatin1("libcontacts"), QString::fromLatin1("-"), QString::fromLatin1("/usr/share/translations"));
+        qApp->installTranslator(translator);
+    }
+
     // Try to parse the structure from the formatted name
     // TODO: Use MBreakIterator for localized splitting
     QStringList tokens(formattedDisplayLabel.split(QChar::fromLatin1(' '), QString::SkipEmptyParts));
