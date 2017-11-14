@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
  */
 
+#ifndef SEASIDE_CACHE_CONFIGURATION_H
+#define SEASIDE_CACHE_CONFIGURATION_H
+
 #include "contactcacheexport.h"
 
 #include <QObject>
@@ -77,3 +80,4 @@ private slots:
 #endif
 };
 
+#endif // SEASIDE_CACHE_CONFIGURATION_H
