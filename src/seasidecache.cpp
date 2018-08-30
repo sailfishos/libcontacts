@@ -2909,9 +2909,9 @@ void SeasideCache::addressRequestStateChanged(QContactAbstractRequest::State sta
 
         m_unknownAddresses.append(data);
     }
+    m_pendingResolve.remove(data);
     data.listener->addressResolved(data.first, data.second, item);
     delete it.key();
-    m_pendingResolve.remove(data);
     m_resolveAddresses.erase(it);
 }
 
