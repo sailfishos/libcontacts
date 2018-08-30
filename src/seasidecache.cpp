@@ -1946,12 +1946,10 @@ bool SeasideCache::event(QEvent *event)
     bool idleProcessing = false;
     startRequest(&idleProcessing);
 
-    if (!m_unknownResolveAddresses.isEmpty()) {
-        // Report any unknown addresses
-        while (!m_unknownResolveAddresses.isEmpty()) {
-            const ResolveData &resolve = m_unknownResolveAddresses.takeFirst();
-            resolve.listener->addressResolved(resolve.first, resolve.second, 0);
-        }
+    // Report any unknown addresses
+    while (!m_unknownResolveAddresses.isEmpty()) {
+        const ResolveData &resolve = m_unknownResolveAddresses.takeFirst();
+        resolve.listener->addressResolved(resolve.first, resolve.second, 0);
     }
 
     if (!m_contactsToAppend.isEmpty() || !m_contactsToUpdate.isEmpty()) {
