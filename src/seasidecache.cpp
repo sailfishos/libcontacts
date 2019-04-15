@@ -314,16 +314,6 @@ QContactFilter favoriteFilter()
     return QContactFavorite::match();
 }
 
-QContactFilter nonfavoriteFilter()
-{
-    QContactDetailFilter filter;
-    setDetailType<QContactFavorite>(filter, QContactFavorite::FieldFavorite);
-    filter.setMatchFlags(QContactFilter::MatchExactly);
-    filter.setValue(false);
-
-    return filter;
-}
-
 QContactFilter onlineFilter()
 {
     return QContactStatusFlags::matchFlag(QContactStatusFlags::IsOnline);
