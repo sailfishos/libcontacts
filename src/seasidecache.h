@@ -34,7 +34,6 @@
 
 #include "contactcacheexport.h"
 #include "cacheconfiguration.h"
-#include "seasidenamegrouper.h"
 
 #include <qtcontacts-extensions.h>
 #include <QContactStatusFlags>
@@ -62,13 +61,13 @@
 
 QTCONTACTS_USE_NAMESPACE
 
-class CONTACTCACHE_EXPORT SeasideNameGroupChangeListener
+class CONTACTCACHE_EXPORT SeasideDisplayLabelGroupChangeListener
 {
 public:
-    SeasideNameGroupChangeListener() {}
-    ~SeasideNameGroupChangeListener() {}
+    SeasideDisplayLabelGroupChangeListener() {}
+    ~SeasideDisplayLabelGroupChangeListener() {}
 
-    virtual void nameGroupsUpdated(const QHash<QString, QSet<quint32> > &groups) = 0;
+    virtual void displayLabelGroupsUpdated(const QHash<QString, QSet<quint32> > &groups) = 0;
 };
 
 class CONTACTCACHE_EXPORT SeasideCache : public QObject
@@ -200,7 +199,7 @@ public:
         quint64 statusFlags;
         ContactState contactState;
         ItemListener *listeners;
-        QString nameGroup;
+        QString displayLabelGroup;
         QString displayLabel;
     };
 
@@ -267,15 +266,13 @@ public:
     static void registerUser(QObject *user);
     static void unregisterUser(QObject *user);
 
-    static void registerNameGroupChangeListener(SeasideNameGroupChangeListener *listener);
-    static void unregisterNameGroupChangeListener(SeasideNameGroupChangeListener *listener);
+    static void registerDisplayLabelGroupChangeListener(SeasideDisplayLabelGroupChangeListener *listener);
+    static void unregisterDisplayLabelGroupChangeListener(SeasideDisplayLabelGroupChangeListener *listener);
 
     static void registerChangeListener(ChangeListener *listener);
     static void unregisterChangeListener(ChangeListener *listener);
 
     static void unregisterResolveListener(ResolveListener *listener);
-
-    static void setNameGrouper(SeasideNameGrouper *grouper);
 
     static DisplayLabelOrder displayLabelOrder();
     static QString sortProperty();
@@ -293,11 +290,9 @@ public:
     static void ensureCompletion(CacheItem *cacheItem);
     static void refreshContact(CacheItem *cacheItem);
 
-    static QString nameGroup(const CacheItem *cacheItem);
-    static QString determineNameGroup(const CacheItem *cacheItem);
-
-    static QStringList allNameGroups();
-    static QHash<QString, QSet<quint32> > nameGroupMembers();
+    static QString displayLabelGroup(const CacheItem *cacheItem);
+    static QStringList allDisplayLabelGroups();
+    static QHash<QString, QSet<quint32> > displayLabelGroupMembers();
 
     static CacheItem *itemByPhoneNumber(const QString &number, bool requireComplete = true);
     static CacheItem *itemByEmailAddress(const QString &address, bool requireComplete = true);
@@ -355,6 +350,7 @@ private slots:
     void contactsChanged(const QList<QContactId> &contactIds);
     void contactsPresenceChanged(const QList<QContactId> &contactIds);
     void contactsRemoved(const QList<QContactId> &contactIds);
+    void displayLabelGroupsChanged(const QStringList &groups);
     void displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder order);
     void sortPropertyChanged(const QString &sortProperty);
     void groupPropertyChanged(const QString &groupProperty);
@@ -396,9 +392,9 @@ private:
     void removeContactData(quint32 iid, FilterType filter);
     void makePopulated(FilterType filter);
 
-    void addToContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);
-    void removeFromContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);
-    void notifyNameGroupsChanged(const QSet<QString> &groups);
+    void addToContactDisplayLabelGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);
+    void removeFromContactDisplayLabelGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups = 0);
+    void notifyDisplayLabelGroupsChanged(const QSet<QString> &groups);
 
     void updateConstituentAggregations(const QContactId &contactId);
     void completeContactAggregation(const QContactId &contact1Id, const QContactId &contact2Id);
@@ -421,7 +417,7 @@ private:
     QHash<QString, quint32> m_emailAddressIds;
     QHash<QPair<QString, QString>, quint32> m_onlineAccountIds;
     QHash<QContactId, QContact> m_contactsToSave;
-    QHash<QString, QSet<quint32> > m_contactNameGroups;
+    QHash<QString, QSet<quint32> > m_contactDisplayLabelGroups;
     QList<QContact> m_contactsToCreate;
     QHash<FilterType, QPair<QSet<QContactDetail::DetailType>, QList<QContact> > > m_contactsToAppend;
     QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > > m_contactsToUpdate;
@@ -435,8 +431,7 @@ private:
     QList<QPair<ContactLinkRequest, ContactLinkRequest> > m_contactPairsToLink;
     QList<QContactRelationship> m_relationshipsToSave;
     QList<QContactRelationship> m_relationshipsToRemove;
-    QScopedPointer<SeasideNameGrouper> m_nameGrouper;
-    QList<SeasideNameGroupChangeListener*> m_nameGroupChangeListeners;
+    QList<SeasideDisplayLabelGroupChangeListener*> m_displayLabelGroupChangeListeners;
     QList<ChangeListener*> m_changeListeners;
     QList<ListModel *> m_models[FilterTypesCount];
     QSet<QObject *> m_users;
@@ -490,8 +485,8 @@ private:
     QElapsedTimer m_fetchPostponed;
 
     static SeasideCache *instancePtr;
-    static int contactNameGroupCount;
-    static QStringList allContactNameGroups;
+    static int contactDisplayLabelGroupCount;
+    static QStringList allContactDisplayLabelGroups;
     static QTranslator *engEnTranslator;
     static QTranslator *translator;
 

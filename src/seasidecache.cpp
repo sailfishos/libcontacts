@@ -33,6 +33,7 @@
 
 #include "synchronizelists.h"
 
+#include <qtcontacts-extensions.h>
 #include <qtcontacts-extensions_impl.h>
 #include <qcontactstatusflags_impl.h>
 #include <contactmanagerengine.h>
@@ -86,18 +87,6 @@ const QString isNotRelationshipType = QString::fromLatin1("IsNot");
 
 const QString syncTargetLocal = QLatin1String("local");
 const QString syncTargetWasLocal = QLatin1String("was_local");
-
-int getContactNameGroupCount()
-{
-    return mLocale.exemplarCharactersIndex().count();
-}
-
-QStringList getAllContactNameGroups()
-{
-    QStringList groups(mLocale.exemplarCharactersIndex());
-    groups.append(QString::fromLatin1("#"));
-    return groups;
-}
 
 // Find the script that all letters in the name belong to, else yield Unknown
 QChar::Script nameScript(const QString &name)
@@ -389,7 +378,7 @@ bool validAddressPair(const StringPair &address)
     return (!address.first.isEmpty() || !address.second.isEmpty());
 }
 
-bool ignoreContactForNameGroups(const QContact &contact)
+bool ignoreContactForDisplayLabelGroups(const QContact &contact)
 {
     static const QString aggregate(QString::fromLatin1("aggregate"));
 
@@ -507,8 +496,8 @@ int bestPhoneNumberMatchLength(const QContact &contact, const QString &match)
 }
 
 SeasideCache *SeasideCache::instancePtr = 0;
-int SeasideCache::contactNameGroupCount = getContactNameGroupCount();
-QStringList SeasideCache::allContactNameGroups = getAllContactNameGroups();
+int SeasideCache::contactDisplayLabelGroupCount = 0;
+QStringList SeasideCache::allContactDisplayLabelGroups = QStringList();
 QTranslator *SeasideCache::engEnTranslator = 0;
 QTranslator *SeasideCache::translator = 0;
 
@@ -592,6 +581,9 @@ SeasideCache::SeasideCache()
     // need to find it from the manager's engine object
     typedef QtContactsSqliteExtensions::ContactManagerEngine EngineType;
     EngineType *cme = dynamic_cast<EngineType *>(QContactManagerData::managerData(mgr)->m_engine);
+    connect(cme, SIGNAL(displayLabelGroupsChanged(QStringList)),
+            this, SLOT(displayLabelGroupsChanged(QStringList)));
+    displayLabelGroupsChanged(cme->displayLabelGroups());
 
     connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
@@ -698,19 +690,19 @@ void SeasideCache::unregisterUser(QObject *user)
     checkForExpiry();
 }
 
-void SeasideCache::registerNameGroupChangeListener(SeasideNameGroupChangeListener *listener)
+void SeasideCache::registerDisplayLabelGroupChangeListener(SeasideDisplayLabelGroupChangeListener *listener)
 {
     // Ensure the cache has been instantiated
     instance();
 
-    instancePtr->m_nameGroupChangeListeners.append(listener);
+    instancePtr->m_displayLabelGroupChangeListeners.append(listener);
 }
 
-void SeasideCache::unregisterNameGroupChangeListener(SeasideNameGroupChangeListener *listener)
+void SeasideCache::unregisterDisplayLabelGroupChangeListener(SeasideDisplayLabelGroupChangeListener *listener)
 {
     if (!instancePtr)
         return;
-    instancePtr->m_nameGroupChangeListeners.removeAll(listener);
+    instancePtr->m_displayLabelGroupChangeListeners.removeAll(listener);
 }
 
 void SeasideCache::registerChangeListener(ChangeListener *listener)
@@ -772,88 +764,26 @@ void SeasideCache::unregisterResolveListener(ResolveListener *listener)
     }
 }
 
-void SeasideCache::setNameGrouper(SeasideNameGrouper *grouper)
-{
-    // Ensure the cache has been instantiated
-    instance();
-
-    instancePtr->m_nameGrouper.reset(grouper);
-
-    allContactNameGroups = instancePtr->m_nameGrouper->allNameGroups();
-    contactNameGroupCount = allContactNameGroups.count();
-    if (!allContactNameGroups.contains(QLatin1String("#")))
-        allContactNameGroups << QLatin1String("#");
-}
-
-QString SeasideCache::nameGroup(const CacheItem *cacheItem)
+QString SeasideCache::displayLabelGroup(const CacheItem *cacheItem)
 {
     if (!cacheItem)
         return QString();
 
-    return cacheItem->nameGroup;
+    return cacheItem->displayLabelGroup;
 }
 
-QString SeasideCache::determineNameGroup(const CacheItem *cacheItem)
-{
-    if (!cacheItem)
-        return QString();
-
-    if (!instancePtr->m_nameGrouper.isNull()) {
-        QString group = instancePtr->m_nameGrouper->nameGroupForContact(cacheItem->contact, groupProperty());
-        if (!group.isNull() && allContactNameGroups.contains(group)) {
-            return group;
-        }
-    }
-
-    const QContactName name(cacheItem->contact.detail<QContactName>());
-    const QString nameProperty(groupProperty() == QString::fromLatin1("firstName") ? name.firstName() : name.lastName());
-
-    QString group;
-    if (!nameProperty.isEmpty()) {
-        group = mLocale.indexBucket(nameProperty);
-    } else if (!cacheItem->displayLabel.isEmpty()) {
-        group = mLocale.indexBucket(cacheItem->displayLabel);
-    }
-
-    if (!group.isEmpty()) {
-        if (!allContactNameGroups.contains(group)) {
-            // If this group is some kind of digit, group under '#'
-            if (mLocale.toLatinNumbers(group.mid(0, 1)).at(0).isDigit()) {
-                group = QString();
-            }
-        }
-    }
-
-    if (group.isEmpty()) {
-        group = QString::fromLatin1("#");
-    } else if (!allContactNameGroups.contains(group)) {
-        // Insert before the '#' group, which is always last, and after the pre-defined groups
-        const int maxIndex = allContactNameGroups.count() - 1;
-        int index = qMin(contactNameGroupCount, maxIndex);
-        for ( ; index < maxIndex; ++index) {
-            if (group < allContactNameGroups.at(index)) {
-                break;
-            }
-        }
-
-        allContactNameGroups.insert(index, group);
-    }
-
-    return group;
-}
-
-QStringList SeasideCache::allNameGroups()
+QStringList SeasideCache::allDisplayLabelGroups()
 {
     // Ensure the cache has been instantiated
     instance();
 
-    return allContactNameGroups;
+    return allContactDisplayLabelGroups;
 }
 
-QHash<QString, QSet<quint32> > SeasideCache::nameGroupMembers()
+QHash<QString, QSet<quint32> > SeasideCache::displayLabelGroupMembers()
 {
     if (instancePtr)
-        return instancePtr->m_contactNameGroups;
+        return instancePtr->m_contactDisplayLabelGroups;
     return QHash<QString, QSet<quint32> >();
 }
 
@@ -1132,10 +1062,10 @@ void SeasideCache::removeContactData(quint32 iid, FilterType filter)
     m_contacts[filter].removeAt(row);
 
     if (filter == FilterAll) {
-        const QString group(nameGroup(existingItem(iid)));
-        QSet<QString> modifiedNameGroups;
-        removeFromContactNameGroup(iid, group, &modifiedNameGroups);
-        notifyNameGroupsChanged(modifiedNameGroups);
+        const QString group(displayLabelGroup(existingItem(iid)));
+        QSet<QString> modifiedDisplayLabelGroups;
+        removeFromContactDisplayLabelGroup(iid, group, &modifiedDisplayLabelGroups);
+        notifyDisplayLabelGroupsChanged(modifiedDisplayLabelGroups);
     }
 
     for (int i = 0; i < models.count(); ++i)
@@ -1979,11 +1909,11 @@ bool SeasideCache::event(QEvent *event)
             // Before removal, ensure none of these contacts are in name groups
             foreach (quint32 iid, removeIds) {
                 if (CacheItem *item = existingItem(iid)) {
-                    removeFromContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
+                    removeFromContactDisplayLabelGroup(item->iid, item->displayLabelGroup, &modifiedGroups);
                 }
             }
 
-            notifyNameGroupsChanged(modifiedGroups);
+            notifyDisplayLabelGroupsChanged(modifiedGroups);
 
             // Remove the contacts from the cache
             foreach (quint32 iid, removeIds) {
@@ -2181,7 +2111,7 @@ void SeasideCache::updateCache(CacheItem *item, const QContact &contact, bool pa
     }
 
     item->displayLabel = generateDisplayLabel(item->contact, displayLabelOrder());
-    item->nameGroup = determineNameGroup(item);
+    item->displayLabelGroup = contact.detail<QContactDisplayLabel>().value(QContactDisplayLabel__FieldLabelGroup).toString();
 
     if (!initialInsert) {
         reportItemUpdated(item);
@@ -2497,7 +2427,7 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, const QS
     foreach (QContact contact, contacts) {
         quint32 iid = internalId(contact);
 
-        QString oldNameGroup;
+        QString oldDisplayLabelGroup;
         QString oldDisplayLabel;
 
         CacheItem *item = existingItem(iid);
@@ -2506,7 +2436,7 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, const QS
             item = &(m_people[iid]);
             item->iid = iid;
         } else {
-            oldNameGroup = item->nameGroup;
+            oldDisplayLabelGroup = item->displayLabelGroup;
             oldDisplayLabel = item->displayLabel;
 
             if (partialFetch) {
@@ -2531,10 +2461,10 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, const QS
         roleDataChanged |= (item->displayLabel != oldDisplayLabel);
 
         // do this even if !roleDataChanged as name groups are affected by other display label changes
-        if (item->nameGroup != oldNameGroup) {
-            if (!ignoreContactForNameGroups(item->contact)) {
-                addToContactNameGroup(item->iid, item->nameGroup, &modifiedGroups);
-                removeFromContactNameGroup(item->iid, oldNameGroup, &modifiedGroups);
+        if (item->displayLabelGroup != oldDisplayLabelGroup) {
+            if (!ignoreContactForDisplayLabelGroups(item->contact)) {
+                addToContactDisplayLabelGroup(item->iid, item->displayLabelGroup, &modifiedGroups);
+                removeFromContactDisplayLabelGroup(item->iid, oldDisplayLabelGroup, &modifiedGroups);
             }
         }
 
@@ -2543,45 +2473,45 @@ void SeasideCache::applyContactUpdates(const QList<QContact> &contacts, const QS
         }
     }
 
-    notifyNameGroupsChanged(modifiedGroups);
+    notifyDisplayLabelGroupsChanged(modifiedGroups);
 }
 
-void SeasideCache::addToContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
+void SeasideCache::addToContactDisplayLabelGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
 {
     if (!group.isEmpty()) {
-        QSet<quint32> &set(m_contactNameGroups[group]);
+        QSet<quint32> &set(m_contactDisplayLabelGroups[group]);
         if (!set.contains(iid)) {
             set.insert(iid);
-            if (modifiedGroups && !m_nameGroupChangeListeners.isEmpty()) {
+            if (modifiedGroups && !m_displayLabelGroupChangeListeners.isEmpty()) {
                 modifiedGroups->insert(group);
             }
         }
     }
 }
 
-void SeasideCache::removeFromContactNameGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
+void SeasideCache::removeFromContactDisplayLabelGroup(quint32 iid, const QString &group, QSet<QString> *modifiedGroups)
 {
     if (!group.isEmpty()) {
-        QSet<quint32> &set(m_contactNameGroups[group]);
+        QSet<quint32> &set(m_contactDisplayLabelGroups[group]);
         if (set.remove(iid)) {
-            if (modifiedGroups && !m_nameGroupChangeListeners.isEmpty()) {
+            if (modifiedGroups && !m_displayLabelGroupChangeListeners.isEmpty()) {
                 modifiedGroups->insert(group);
             }
         }
     }
 }
 
-void SeasideCache::notifyNameGroupsChanged(const QSet<QString> &groups)
+void SeasideCache::notifyDisplayLabelGroupsChanged(const QSet<QString> &groups)
 {
-    if (groups.isEmpty() || m_nameGroupChangeListeners.isEmpty())
+    if (groups.isEmpty() || m_displayLabelGroupChangeListeners.isEmpty())
         return;
 
     QHash<QString, QSet<quint32> > updates;
     foreach (const QString &group, groups)
-        updates.insert(group, m_contactNameGroups[group]);
+        updates.insert(group, m_contactDisplayLabelGroups[group]);
 
-    for (int i = 0; i < m_nameGroupChangeListeners.count(); ++i)
-        m_nameGroupChangeListeners[i]->nameGroupsUpdated(updates);
+    for (int i = 0; i < m_displayLabelGroupChangeListeners.count(); ++i)
+        m_displayLabelGroupChangeListeners[i]->displayLabelGroupsUpdated(updates);
 }
 
 void SeasideCache::contactIdsAvailable()
@@ -2695,14 +2625,14 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
                 updateCache(item, contact, partialFetch, true);
 
                 if (filterType == FilterAll) {
-                    addToContactNameGroup(iid, nameGroup(item), &modifiedGroups);
+                    addToContactDisplayLabelGroup(iid, displayLabelGroup(item), &modifiedGroups);
                 }
             }
 
             for (int i = 0; i < models.count(); ++i)
                 models.at(i)->sourceItemsInserted(begin, end);
 
-            notifyNameGroupsChanged(modifiedGroups);
+            notifyDisplayLabelGroupsChanged(modifiedGroups);
         }
     }
 }
@@ -2938,8 +2868,11 @@ void SeasideCache::setSortOrder(const QString &property)
     lastNameOrder.setDirection(Qt::AscendingOrder);
     lastNameOrder.setBlankPolicy(QContactSortOrder::BlanksFirst);
 
-    m_sortOrder = firstNameFirst ? (QList<QContactSortOrder>() << firstNameOrder << lastNameOrder)
-                                 : (QList<QContactSortOrder>() << lastNameOrder << firstNameOrder);
+    QContactSortOrder displayLabelGroupOrder;
+    setDetailType<QContactDisplayLabel>(displayLabelGroupOrder, QContactDisplayLabel__FieldLabelGroup);
+
+    m_sortOrder = firstNameFirst ? (QList<QContactSortOrder>() << displayLabelGroupOrder << firstNameOrder << lastNameOrder)
+                                 : (QList<QContactSortOrder>() << displayLabelGroupOrder << lastNameOrder << firstNameOrder);
 
     m_onlineSortOrder = m_sortOrder;
 
@@ -2952,8 +2885,6 @@ void SeasideCache::setSortOrder(const QString &property)
 
 void SeasideCache::displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder order)
 {
-    QSet<QString> modifiedGroups;
-
     // Update the display labels
     typedef QHash<quint32, CacheItem>::iterator iterator;
     for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
@@ -2969,20 +2900,7 @@ void SeasideCache::displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrde
         if (it->itemData) {
             it->itemData->displayLabelOrderChanged(static_cast<DisplayLabelOrder>(order));
         }
-
-        // If the contact's name group is derived from display label, it may have changed
-        const QString group(determineNameGroup(&*it));
-        if (group != it->nameGroup) {
-            if (!ignoreContactForNameGroups(it->contact)) {
-                removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-
-                it->nameGroup = group;
-                addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-            }
-        }
     }
-
-    notifyNameGroupsChanged(modifiedGroups);
 
     for (int i = 0; i < FilterTypesCount; ++i) {
         const QList<ListModel *> &models = m_models[i];
@@ -2992,6 +2910,12 @@ void SeasideCache::displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrde
             model->sourceItemsChanged();
         }
     }
+}
+
+void SeasideCache::displayLabelGroupsChanged(const QStringList &groups)
+{
+    allContactDisplayLabelGroups = groups;
+    contactDisplayLabelGroupCount = groups.count();
 }
 
 void SeasideCache::sortPropertyChanged(const QString &sortProperty)
@@ -3013,25 +2937,11 @@ void SeasideCache::sortPropertyChanged(const QString &sortProperty)
 
 void SeasideCache::groupPropertyChanged(const QString &)
 {
-    // Update the name groups
-    QSet<QString> modifiedGroups;
+    // It is unfortunate that this is required at all!
+    // Maybe handling for this could be added to dataChanged()
+    // instead?  TODO: investigate that possibility.
 
-    typedef QHash<quint32, CacheItem>::iterator iterator;
-    for (iterator it = m_people.begin(); it != m_people.end(); ++it) {
-        // Update the nameGroup for this contact
-        const QString group(determineNameGroup(&*it));
-        if (group != it->nameGroup) {
-            if (!ignoreContactForNameGroups(it->contact)) {
-                removeFromContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-
-                it->nameGroup = group;
-                addToContactNameGroup(it->iid, it->nameGroup, &modifiedGroups);
-            }
-        }
-    }
-
-    notifyNameGroupsChanged(modifiedGroups);
-
+    // The backend will automatically update, but notify the models of the change.
     for (int i = 0; i < FilterTypesCount; ++i) {
         const QList<ListModel *> &models = m_models[i];
         for (int j = 0; j < models.count(); ++j) {
@@ -3040,6 +2950,10 @@ void SeasideCache::groupPropertyChanged(const QString &)
             model->sourceItemsChanged();
         }
     }
+
+    // Update the sorted list order
+    m_refreshRequired = true;
+    requestUpdate();
 }
 
 void SeasideCache::displayStatusChanged(const QString &status)

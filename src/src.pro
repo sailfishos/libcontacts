@@ -21,7 +21,7 @@ packagesExist(mlite5) {
 } else {
     warning("mlite not available. Some functionality may not work as expected.")
 }
-PKGCONFIG += mlocale5 mce
+PKGCONFIG += mlocale5 mce qtcontacts-sqlite-qt5-extensions
 
 DEFINES += CONTACTCACHE_BUILD
 
@@ -49,7 +49,6 @@ HEADERS += \
     $$PWD/seasideimport.h \
     $$PWD/seasidecontactbuilder.h \
     $$PWD/synchronizelists.h \
-    $$PWD/seasidenamegrouper.h \
     $$PWD/seasidepropertyhandler.h
 
 headers.files = \
@@ -60,7 +59,6 @@ headers.files = \
     $$PWD/seasideimport.h \
     $$PWD/seasidecontactbuilder.h \
     $$PWD/synchronizelists.h \
-    $$PWD/seasidenamegrouper.h \
     $$PWD/seasidepropertyhandler.h
 headers.path = $$PREFIX/include/$$TARGET
 INSTALLS += headers
