@@ -1,6 +1,6 @@
 Name:       libcontacts-qt5
 Summary:    Nemo contact cache library
-Version:    0.1.8
+Version:    0.2.1
 Release:    1
 Group:      System/Libraries
 License:    BSD
@@ -14,7 +14,7 @@ BuildRequires:  pkgconfig(Qt5Versit)
 BuildRequires:  pkgconfig(mlite5)
 BuildRequires:  pkgconfig(mlocale5)
 BuildRequires:  pkgconfig(mce)
-BuildRequires:  pkgconfig(qtcontacts-sqlite-qt5-extensions) >= 0.2.1
+BuildRequires:  pkgconfig(qtcontacts-sqlite-qt5-extensions) >= 0.2.31
 BuildRequires:  qt5-qttools
 BuildRequires:  qt5-qttools-linguist
 
