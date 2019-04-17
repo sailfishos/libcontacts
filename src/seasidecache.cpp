@@ -999,6 +999,7 @@ bool SeasideCache::saveContact(const QContact &contact)
     }
 
     instancePtr->requestUpdate();
+    instancePtr->updateSectionBucketIndexCaches();
 
     return true;
 }
@@ -2034,6 +2035,7 @@ void SeasideCache::dataChanged()
             model->updateGroupProperty();
             model->sourceItemsChanged();
             model->sourceDataChanged(0, m_contacts[i].size());
+            model->updateSectionBucketIndexCache();
         }
     }
 
@@ -2342,6 +2344,7 @@ void SeasideCache::contactsAvailable()
         if (contacts.count() == 1 || request == &m_fetchByIdRequest) {
             // Process these results immediately
             applyContactUpdates(contacts, queryDetailTypes);
+            updateSectionBucketIndexCaches(); // note: can cause out-of-order since this doesn't result in refresh request.  TODO: remove this line?
         } else {
             // Add these contacts to the list to be progressively appended
             QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin(), end = m_contactsToUpdate.end();
@@ -2406,6 +2409,7 @@ void SeasideCache::applyPendingContactUpdates()
                 makePopulated(FilterOnline);
                 qDebug() << "Online queried in" << m_timer.elapsed() << "ms";
             }
+            updateSectionBucketIndexCaches();
         }
     } else {
         QList<QPair<QSet<QContactDetail::DetailType>, QList<QContact> > >::iterator it = m_contactsToUpdate.begin();
@@ -2419,6 +2423,17 @@ void SeasideCache::applyPendingContactUpdates()
 
         if (updatedContacts.isEmpty()) {
             m_contactsToUpdate.erase(it);
+            updateSectionBucketIndexCaches();
+        }
+    }
+}
+
+void SeasideCache::updateSectionBucketIndexCaches()
+{
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (ListModel *model : models) {
+            model->updateSectionBucketIndexCache();
         }
     }
 }

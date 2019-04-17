@@ -232,6 +232,8 @@ public:
         virtual void updateDisplayLabelOrder() = 0;
         virtual void updateSortProperty() = 0;
         virtual void updateGroupProperty() = 0;
+
+        virtual void updateSectionBucketIndexCache() = 0;
     };
 
     struct ResolveListener
@@ -377,6 +379,7 @@ private:
     void updateContacts(const QList<QContactId> &contactIds, QList<QContactId> *updateList);
     void applyPendingContactUpdates();
     void applyContactUpdates(const QList<QContact> &contacts, const QSet<QContactDetail::DetailType> &queryDetailTypes);
+    void updateSectionBucketIndexCaches();
 
     void resolveUnknownAddresses(const QString &first, const QString &second, CacheItem *item);
     bool updateContactIndexing(const QContact &oldContact, const QContact &contact, quint32 iid, const QSet<QContactDetail::DetailType> &queryDetailTypes, CacheItem *item);
