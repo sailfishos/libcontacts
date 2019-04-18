@@ -564,7 +564,6 @@ SeasideCache::SeasideCache()
     connect(config, SIGNAL(displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder)),
             this, SLOT(displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder)));
     connect(config, SIGNAL(sortPropertyChanged(QString)), this, SLOT(sortPropertyChanged(QString)));
-    connect(config, SIGNAL(groupPropertyChanged(QString)), this, SLOT(groupPropertyChanged(QString)));
 
     // Is this a GUI application?  If so, we want to defer some processing when the display is off
     if (qApp && qApp->property("applicationDisplayName").isValid()) {
@@ -585,7 +584,7 @@ SeasideCache::SeasideCache()
             this, SLOT(displayLabelGroupsChanged(QStringList)));
     displayLabelGroupsChanged(cme->displayLabelGroups());
 
-    connect(mgr, SIGNAL(dataChanged()), this, SLOT(updateContacts()));
+    connect(mgr, SIGNAL(dataChanged()), this, SLOT(dataChanged()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactId>)),
@@ -2025,7 +2024,7 @@ void SeasideCache::contactsRemoved(const QList<QContactId> &ids)
     requestUpdate();
 }
 
-void SeasideCache::updateContacts()
+void SeasideCache::dataChanged()
 {
     QList<QContactId> contactIds;
 
@@ -2036,6 +2035,21 @@ void SeasideCache::updateContacts()
     }
 
     updateContacts(contactIds, &m_changedContacts);
+
+    // The backend will automatically update, but notify the models of the change.
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (int j = 0; j < models.count(); ++j) {
+            ListModel *model = models.at(j);
+            model->updateGroupProperty();
+            model->sourceItemsChanged();
+            model->sourceDataChanged(0, m_contacts[i].size());
+        }
+    }
+
+    // Update the sorted list order
+    m_refreshRequired = true;
+    requestUpdate();
 }
 
 void SeasideCache::fetchContacts()
@@ -2927,27 +2941,6 @@ void SeasideCache::sortPropertyChanged(const QString &sortProperty)
         for (int j = 0; j < models.count(); ++j) {
             models.at(j)->updateSortProperty();
             // No need for sourceItemsChanged, as the sorted list update will cause that
-        }
-    }
-
-    // Update the sorted list order
-    m_refreshRequired = true;
-    requestUpdate();
-}
-
-void SeasideCache::groupPropertyChanged(const QString &)
-{
-    // It is unfortunate that this is required at all!
-    // Maybe handling for this could be added to dataChanged()
-    // instead?  TODO: investigate that possibility.
-
-    // The backend will automatically update, but notify the models of the change.
-    for (int i = 0; i < FilterTypesCount; ++i) {
-        const QList<ListModel *> &models = m_models[i];
-        for (int j = 0; j < models.count(); ++j) {
-            ListModel *model = models.at(j);
-            model->updateGroupProperty();
-            model->sourceItemsChanged();
         }
     }
 

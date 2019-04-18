@@ -345,7 +345,7 @@ private slots:
     void relationshipsAvailable();
     void requestStateChanged(QContactAbstractRequest::State state);
     void addressRequestStateChanged(QContactAbstractRequest::State state);
-    void updateContacts();
+    void dataChanged();
     void contactsAdded(const QList<QContactId> &contactIds);
     void contactsChanged(const QList<QContactId> &contactIds);
     void contactsPresenceChanged(const QList<QContactId> &contactIds);
@@ -353,7 +353,6 @@ private slots:
     void displayLabelGroupsChanged(const QStringList &groups);
     void displayLabelOrderChanged(CacheConfiguration::DisplayLabelOrder order);
     void sortPropertyChanged(const QString &sortProperty);
-    void groupPropertyChanged(const QString &groupProperty);
     void displayStatusChanged(const QString &);
 
 private:
