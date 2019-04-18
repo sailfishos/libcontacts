@@ -83,7 +83,7 @@ struct TestResolveListener : public SeasideCache::ResolveListener {
     SeasideCache::CacheItem *m_item;
 };
 
-}; // anonymous
+} // anonymous
 
 void tst_Resolve::initTestCase()
 {
