@@ -1,6 +1,6 @@
 Name:       libcontacts-qt5
 Summary:    Nemo contact cache library
-Version:    0.2.1
+Version:    0.2.3
 Release:    1
 Group:      System/Libraries
 License:    BSD
@@ -24,7 +24,6 @@ BuildRequires:  qt5-qttools-linguist
 %package tests
 Summary:    Nemo contact cache library tests
 Group:      System/Libraries
-Requires:   blts-tools
 Requires:   %{name} = %{version}-%{release}
 
 %description tests
