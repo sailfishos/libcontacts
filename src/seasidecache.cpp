@@ -2574,8 +2574,10 @@ void SeasideCache::removeRange(FilterType filter, int index, int count)
         cacheIds.removeAt(index);
     }
 
-    for (int i = 0; i < models.count(); ++i)
+    for (int i = 0; i < models.count(); ++i) {
         models[i]->sourceItemsRemoved();
+        models[i]->updateSectionBucketIndexCache();
+    }
 }
 
 int SeasideCache::insertRange(FilterType filter, int index, int count, const QList<quint32> &queryIds, int queryIndex)
@@ -2602,8 +2604,10 @@ int SeasideCache::insertRange(FilterType filter, int index, int count, const QLi
         cacheIds.insert(index + i, iid);
     }
 
-    for (int i = 0; i < models.count(); ++i)
+    for (int i = 0; i < models.count(); ++i) {
         models[i]->sourceItemsInserted(index, end);
+        models[i]->updateSectionBucketIndexCache();
+    }
 
     return end - index + 1;
 }
