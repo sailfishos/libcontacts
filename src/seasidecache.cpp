@@ -2660,6 +2660,17 @@ void SeasideCache::appendContacts(const QList<QContact> &contacts, FilterType fi
     }
 }
 
+void SeasideCache::notifySaveContactComplete(int constituentId, int aggregateId)
+{
+    for (int i = 0; i < FilterTypesCount; ++i) {
+        const QList<ListModel *> &models = m_models[i];
+        for (int j = 0; j < models.count(); ++j) {
+            ListModel *model = models.at(j);
+            model->saveContactComplete(constituentId, aggregateId);
+        }
+    }
+}
+
 void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
 {
     if (state != QContactAbstractRequest::FinishedState)
@@ -2799,6 +2810,37 @@ void SeasideCache::requestStateChanged(QContactAbstractRequest::State state)
                 m_populateProgress = Populated;
             }
             m_populating = false;
+        }
+    } else if (request == &m_saveRequest) {
+        for (int i = 0; i < m_saveRequest.contacts().size(); ++i) {
+            const QContact c = m_saveRequest.contacts().at(i);
+            if (m_saveRequest.errorMap().value(i) != QContactManager::NoError) {
+                notifySaveContactComplete(-1, -1);
+            } else if (c.detail<QContactSyncTarget>().syncTarget() == QStringLiteral("aggregate")) {
+                // In case an aggregate is saved rather than a local constituent,
+                // no need to look up the aggregate via a relationship fetch request.
+                notifySaveContactComplete(-1, internalId(c));
+            } else {
+                // Get the aggregate associated with this contact.
+                QContactRelationshipFetchRequest *rfr = new QContactRelationshipFetchRequest(this);
+                rfr->setManager(m_saveRequest.manager());
+                rfr->setRelationshipType(QContactRelationship::Aggregates());
+                rfr->setSecond(c);
+                connect(rfr, &QContactAbstractRequest::stateChanged, this, [this, c, rfr] {
+                    if (rfr->state() == QContactAbstractRequest::FinishedState) {
+                        rfr->deleteLater();
+                        if (rfr->relationships().size()) {
+                            const quint32 constituentId = internalId(apiId(rfr->relationships().at(0).second()));
+                            const quint32 aggregateId = internalId(apiId(rfr->relationships().at(0).first()));
+                            this->notifySaveContactComplete(constituentId, aggregateId);
+                        } else {
+                            // error: cannot retrieve aggregate for newly created constituent.
+                            this->notifySaveContactComplete(internalId(c), -1);
+                        }
+                    }
+                });
+                rfr->start();
+            }
         }
     }
 

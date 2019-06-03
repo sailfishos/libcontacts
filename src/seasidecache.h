@@ -234,6 +234,8 @@ public:
         virtual void updateGroupProperty() = 0;
 
         virtual void updateSectionBucketIndexCache() = 0;
+
+        virtual void saveContactComplete(int localId, int aggregateId) = 0;
     };
 
     struct ResolveListener
@@ -406,6 +408,8 @@ private:
     CacheItem *itemMatchingPhoneNumber(const QString &number, const QString &normalized, bool requireComplete);
 
     int contactIndex(quint32 iid, FilterType filter);
+
+    void notifySaveContactComplete(int constituentId, int aggregateId);
 
     static QContactRelationship makeRelationship(const QString &type, const QContactId &id1, const QContactId &id2);
     static QContactRelationship makeRelationship(const QString &type, const QContact &contact1, const QContact &contact2);
