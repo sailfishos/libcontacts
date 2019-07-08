@@ -1,6 +1,6 @@
 Name:       libcontacts-qt5
 Summary:    Nemo contact cache library
-Version:    0.2.4
+Version:    0.2.6
 Release:    1
 Group:      System/Libraries
 License:    BSD
