@@ -1024,19 +1024,35 @@ void SeasideCache::contactDataChanged(quint32 iid, FilterType filter)
 
 bool SeasideCache::removeContact(const QContact &contact)
 {
-    QContactId id = apiId(contact);
-    if (!validId(id))
-        return false;
+    return removeContacts(QList<QContact>() << contact);
+}
 
-    instancePtr->m_contactsToRemove.append(id);
+bool SeasideCache::removeContacts(const QList<QContact> &contacts)
+{
+    bool allSucceeded = true;
+    QSet<QString> modifiedDisplayLabelGroups;
+    for (const QContact &contact : contacts) {
+        const QContactId id = apiId(contact);
+        if (!validId(id)) {
+            allSucceeded = false;
+            continue;
+        }
 
-    quint32 iid = internalId(id);
-    instancePtr->removeContactData(iid, FilterFavorites);
-    instancePtr->removeContactData(iid, FilterOnline);
-    instancePtr->removeContactData(iid, FilterAll);
+        instancePtr->m_contactsToRemove.append(id);
 
+        quint32 iid = internalId(id);
+        instancePtr->removeContactData(iid, FilterFavorites);
+        instancePtr->removeContactData(iid, FilterOnline);
+        instancePtr->removeContactData(iid, FilterAll);
+
+        const QString group(displayLabelGroup(existingItem(iid)));
+        instancePtr->removeFromContactDisplayLabelGroup(iid, group, &modifiedDisplayLabelGroups);
+    }
+
+    instancePtr->notifyDisplayLabelGroupsChanged(modifiedDisplayLabelGroups);
+    instancePtr->updateSectionBucketIndexCaches();
     instancePtr->requestUpdate();
-    return true;
+    return allSucceeded;
 }
 
 void SeasideCache::removeContactData(quint32 iid, FilterType filter)
@@ -1050,13 +1066,6 @@ void SeasideCache::removeContactData(quint32 iid, FilterType filter)
         models.at(i)->sourceAboutToRemoveItems(row, row);
 
     m_contacts[filter].removeAt(row);
-
-    if (filter == FilterAll) {
-        const QString group(displayLabelGroup(existingItem(iid)));
-        QSet<QString> modifiedDisplayLabelGroups;
-        removeFromContactDisplayLabelGroup(iid, group, &modifiedDisplayLabelGroups);
-        notifyDisplayLabelGroupsChanged(modifiedDisplayLabelGroups);
-    }
 
     for (int i = 0; i < models.count(); ++i)
         models.at(i)->sourceItemsRemoved();
@@ -1913,6 +1922,8 @@ bool SeasideCache::event(QEvent *event)
                     m_people.erase(cacheItem);
                 }
             }
+
+            updateSectionBucketIndexCaches();
         }
     }
     return true;

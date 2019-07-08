@@ -308,6 +308,7 @@ public:
 
     static bool saveContact(const QContact &contact);
     static bool removeContact(const QContact &contact);
+    static bool removeContacts(const QList<QContact> &contacts);
 
     static void aggregateContacts(const QContact &contact1, const QContact &contact2);
     static void disaggregateContacts(const QContact &contact1, const QContact &contact2);
