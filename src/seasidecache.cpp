@@ -2209,8 +2209,10 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
                     resolveUnknownAddresses(address.first, address.second, item);
                 }
 
-                if (!m_phoneNumberIds.contains(address.second, iid))
-                    m_phoneNumberIds.insert(address.second, iid);
+                CachedPhoneNumber cachedPhoneNumber(normalizePhoneNumber(phoneNumber.number()), iid);
+
+                if (!m_phoneNumberIds.contains(address.second, cachedPhoneNumber))
+                    m_phoneNumberIds.insert(address.second, cachedPhoneNumber);
             }
         }
 
@@ -2218,7 +2220,7 @@ bool SeasideCache::updateContactIndexing(const QContact &oldContact, const QCont
         if (!oldAddresses.isEmpty()) {
             modified = true;
             foreach (const StringPair &address, oldAddresses) {
-                m_phoneNumberIds.remove(address.second, iid);
+                m_phoneNumberIds.remove(address.second);
             }
             oldAddresses.clear();
         }
@@ -3310,23 +3312,23 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
 
 SeasideCache::CacheItem *SeasideCache::itemMatchingPhoneNumber(const QString &number, const QString &normalized, bool requireComplete)
 {
-    QMultiHash<QString, quint32>::const_iterator it = m_phoneNumberIds.find(number), end = m_phoneNumberIds.constEnd();
+    QMultiHash<QString, CachedPhoneNumber>::const_iterator it = m_phoneNumberIds.find(number), end = m_phoneNumberIds.constEnd();
     if (it != end) {
         // How many matches are there for this number?
         int matchCount = 1;
-        QMultiHash<QString, quint32>::const_iterator matchingIt = it + 1;
+        QMultiHash<QString, CachedPhoneNumber>::const_iterator matchingIt = it + 1;
         while ((matchingIt != end) && (matchingIt.key() == number)) {
              ++matchCount;
              ++matchingIt;
         }
         if (matchCount == 1)
-            return itemById(*it, requireComplete);
+            return itemById(it->iid, requireComplete);
 
         // Choose the best match from these contacts
         int bestMatchLength = 0;
         CacheItem *matchItem = 0;
         for ( ; matchCount > 0; ++it, --matchCount) {
-            if (CacheItem *item = existingItem(*it)) {
+            if (CacheItem *item = existingItem(it->iid)) {
                 int matchLength = bestPhoneNumberMatchLength(item->contact, normalized);
                 if (matchLength > bestMatchLength) {
                     bestMatchLength = matchLength;

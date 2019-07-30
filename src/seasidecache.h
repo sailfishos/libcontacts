@@ -139,6 +139,21 @@ public:
         void *key;
     };
 
+    struct CachedPhoneNumber
+    {
+        CachedPhoneNumber() {}
+        CachedPhoneNumber(const QString &n, quint32 i) : normalizedNumber(n), iid(i) {}
+        CachedPhoneNumber(const CachedPhoneNumber &other) : normalizedNumber(other.normalizedNumber), iid(other.iid) {}
+
+        bool operator==(const CachedPhoneNumber &other) const
+        {
+            return other.normalizedNumber == normalizedNumber && other.iid == iid;
+        }
+
+        QString normalizedNumber;
+        quint32 iid;
+    };
+
     struct CacheItem
     {
         CacheItem() : itemData(0), iid(0), statusFlags(0), contactState(ContactAbsent), listeners(0), filterMatchRole(-1) {}
@@ -422,7 +437,7 @@ private:
     QBasicTimer m_expiryTimer;
     QBasicTimer m_fetchTimer;
     QHash<quint32, CacheItem> m_people;
-    QMultiHash<QString, quint32> m_phoneNumberIds;
+    QMultiHash<QString, CachedPhoneNumber> m_phoneNumberIds;
     QHash<QString, quint32> m_emailAddressIds;
     QHash<QPair<QString, QString>, quint32> m_onlineAccountIds;
     QHash<QContactId, QContact> m_contactsToSave;
