@@ -22,6 +22,7 @@ packagesExist(mlite5) {
     warning("mlite not available. Some functionality may not work as expected.")
 }
 PKGCONFIG += mlocale5 mce qtcontacts-sqlite-qt5-extensions
+LIBS += -lphonenumber
 
 DEFINES += CONTACTCACHE_BUILD
 

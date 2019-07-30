@@ -73,6 +73,7 @@
 
 #include <mce/dbus-names.h>
 #include <mce/mode-names.h>
+#include <phonenumbers/phonenumberutil.h>
 
 QTVERSIT_USE_NAMESPACE
 
@@ -3313,41 +3314,66 @@ void SeasideCache::resolveAddress(ResolveListener *listener, const QString &firs
 SeasideCache::CacheItem *SeasideCache::itemMatchingPhoneNumber(const QString &number, const QString &normalized, bool requireComplete)
 {
     QMultiHash<QString, CachedPhoneNumber>::const_iterator it = m_phoneNumberIds.find(number), end = m_phoneNumberIds.constEnd();
-    if (it != end) {
-        // How many matches are there for this number?
-        int matchCount = 1;
-        QMultiHash<QString, CachedPhoneNumber>::const_iterator matchingIt = it + 1;
-        while ((matchingIt != end) && (matchingIt.key() == number)) {
-             ++matchCount;
-             ++matchingIt;
-        }
-        if (matchCount == 1)
-            return itemById(it->iid, requireComplete);
+    if (it == end)
+        return 0;
 
-        // Choose the best match from these contacts
-        int bestMatchLength = 0;
-        CacheItem *matchItem = 0;
-        for ( ; matchCount > 0; ++it, --matchCount) {
-            if (CacheItem *item = existingItem(it->iid)) {
-                int matchLength = bestPhoneNumberMatchLength(item->contact, normalized);
-                if (matchLength > bestMatchLength) {
-                    bestMatchLength = matchLength;
-                    matchItem = item;
-                    if (bestMatchLength == ExactMatch)
-                        break;
-                }
-            }
-        }
+    QHash<QString, quint32> possibleMatches;
+    ::i18n::phonenumbers::PhoneNumberUtil *util = ::i18n::phonenumbers::PhoneNumberUtil::GetInstance();
+    ::std::string normalizedStdStr = normalized.toStdString();
 
-        if (matchItem != 0) {
-            if (requireComplete) {
-                ensureCompletion(matchItem);
-            }
-            return matchItem;
+    for (QMultiHash<QString, CachedPhoneNumber>::const_iterator matchingIt = it;
+         matchingIt != end && matchingIt.key() == number;
+         ++matchingIt) {
+
+        const CachedPhoneNumber &cachedPhoneNumber = matchingIt.value();
+
+        // Bypass libphonenumber if the numbers match exactly
+        if (matchingIt->normalizedNumber == normalized)
+            return itemById(cachedPhoneNumber.iid, requireComplete);
+
+        ::i18n::phonenumbers::PhoneNumberUtil::MatchType matchType =
+                util->IsNumberMatchWithTwoStrings(normalizedStdStr, cachedPhoneNumber.normalizedNumber.toStdString());
+
+        switch (matchType) {
+        case ::i18n::phonenumbers::PhoneNumberUtil::EXACT_MATCH:
+            // This is the optimal outcome
+            return itemById(cachedPhoneNumber.iid, requireComplete);
+        case ::i18n::phonenumbers::PhoneNumberUtil::NSN_MATCH:
+        case ::i18n::phonenumbers::PhoneNumberUtil::SHORT_NSN_MATCH:
+            // Store numbers whose NSN (national significant number) might match
+            // Example: if +36701234567 is calling, then 1234567 is an NSN match
+            possibleMatches.insert(cachedPhoneNumber.normalizedNumber, cachedPhoneNumber.iid);
+            break;
+        default:
+            // Either couldn't parse the number or it was NO_MATCH, ignore it
+            break;
         }
     }
 
+    // Choose the best match from these contacts
+    int bestMatchLength = 0;
+    CacheItem *matchItem = 0;
+    for (QHash<QString, quint32>::const_iterator matchingIt = possibleMatches.begin(); matchingIt != possibleMatches.end(); ++matchingIt) {
+        if (CacheItem *item = existingItem(*matchingIt)) {
+            int matchLength = bestPhoneNumberMatchLength(item->contact, normalized);
+            if (matchLength > bestMatchLength) {
+                bestMatchLength = matchLength;
+                matchItem = item;
+                if (bestMatchLength == ExactMatch)
+                    break;
+            }
+        }
+    }
+
+    if (matchItem != 0) {
+        if (requireComplete) {
+            ensureCompletion(matchItem);
+        }
+        return matchItem;
+    }
+
     return 0;
+
 }
 
 int SeasideCache::contactIndex(quint32 iid, FilterType filterType)
