@@ -2886,7 +2886,8 @@ void SeasideCache::addressRequestStateChanged(QContactAbstractRequest::State sta
     const QList<QContact> &resolvedContacts = it.key()->contacts();
 
     if (!resolvedContacts.isEmpty()) {
-        if (resolvedContacts.count() == 1) {
+        if (resolvedContacts.count() == 1 && data.first != QString()) {
+            // Return the result because it is the only resolved contact; however still filter out false positive phone number matches
             item = itemById(apiId(resolvedContacts.first()), false);
         } else {
             // Lookup the result in our updated indexes
