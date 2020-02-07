@@ -15,6 +15,7 @@ BuildRequires:  pkgconfig(mlite5)
 BuildRequires:  pkgconfig(mlocale5)
 BuildRequires:  pkgconfig(mce)
 BuildRequires:  pkgconfig(qtcontacts-sqlite-qt5-extensions) >= 0.2.31
+BuildRequires:  libphonenumber-devel
 BuildRequires:  qt5-qttools
 BuildRequires:  qt5-qttools-linguist
 

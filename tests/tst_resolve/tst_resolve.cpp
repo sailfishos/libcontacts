@@ -60,7 +60,9 @@ private:
     QList<QContactId> m_createdContacts;
 
 private slots:
+    void resolveByPhone_data();
     void resolveByPhone();
+    void resolveByPhoneNotFound_data();
     void resolveByPhoneNotFound();
     void resolveByEmail();
     void resolveByEmailNotFound();
@@ -145,13 +147,51 @@ void tst_Resolve::makeContacts()
     QVERIFY(makeContact("Daffy", "Duck", "+358470009955", "daffyd@example.com", ""));
     QVERIFY(makeContact("Dafferd", "Duck", "", "daffy.d@example.com", ""));
     QVERIFY(makeContact("Ernest", "Everest", "+358477758885", "", ""));
+    QVERIFY(makeContact("John", "Smith", "+36701234567", "", ""));
+    QVERIFY(makeContact("Jane", "Smith", "06207654321", "", ""));
+}
+
+void tst_Resolve::resolveByPhone_data()
+{
+    QTest::addColumn<QString>("country");
+    QTest::addColumn<QString>("number");
+    QTest::addColumn<QString>("matchingName");
+
+    QTest::newRow("Daffy international")
+            << "FI" << "+358470009955" << "Daffy";
+    QTest::newRow("Daffy international direct dial")
+            << "FI" << "00358470009955" << "Daffy";
+
+    QTest::newRow("John international")
+            << "HU" << "+36701234567" << "John";
+    QTest::newRow("John international direct dial")
+            << "HU" << "0036701234567" << "John";
+    QTest::newRow("John international without plus")
+            << "HU" << "36701234567" << "John";
+    QTest::newRow("John full national")
+            << "HU" << "06701234567" << "John";
+
+    QTest::newRow("Jane international")
+            << "HU" << "+36207654321" << "Jane";
+    QTest::newRow("Jane international without plus")
+            << "HU" << "36207654321" << "Jane";
+    QTest::newRow("Jane full national")
+            << "HU" << "06207654321" << "Jane";
 }
 
 void tst_Resolve::resolveByPhone()
 {
+    // Note:
+    // When running these tests, make sure you don't have any of the above
+    // numbers in your contact list, as those will interfere with the results.
+
+    QFETCH(QString, country);
+    QFETCH(QString, number);
+    QFETCH(QString, matchingName);
+    Q_UNUSED(country)
+
     SeasideCache::CacheItem *item;
     TestResolveListener listener;
-    QString number("+358470009955");
 
     item = SeasideCache::resolvePhoneNumber(&listener, number, true);
     if (!item) {
@@ -159,20 +199,57 @@ void tst_Resolve::resolveByPhone()
         item = listener.m_item;
     }
 
+    QVERIFY(item != 0);
+
     QContactName name = item->contact.detail<QContactName>();
-    QCOMPARE(name.firstName(), QString::fromLatin1("Daffy"));
+    QCOMPARE(name.firstName(), matchingName);
+}
+
+void tst_Resolve::resolveByPhoneNotFound_data()
+{
+    QTest::addColumn<QString>("country");
+    QTest::addColumn<QString>("number");
+
+    QTest::newRow("Non-existent British number")
+            << "GB" << "+44123456789";
+    QTest::newRow("Non-existent Finnish number")
+            << "FI" << "+35898765432100";
+
+    QTest::newRow("Daffy same NSN different country")
+            << "HU" << "+36470009955";
+    QTest::newRow("Daffy same number same country different area code")
+            << "FI" << "+358570009955";
+
+    QTest::newRow("John same NSN different country")
+            << "HU" << "+44701234567";
+    QTest::newRow("John same number same country different area code")
+            << "HU" << "+36201234567";
+
+    QTest::newRow("Jane same number different area code international")
+            << "HU" << "+36307654321";
+    QTest::newRow("Jane same number different area code full national")
+            << "HU" << "06307654321";
 }
 
 void tst_Resolve::resolveByPhoneNotFound()
 {
+    // Note:
+    // When running these tests, make sure you don't have any of the above
+    // numbers in your contact list, as those will interfere with the results.
+
+    QFETCH(QString, country);
+    QFETCH(QString, number);
+    Q_UNUSED(country)
+
     SeasideCache::CacheItem *item;
     TestResolveListener listener;
-    QString number("+358470000000");
 
     item = SeasideCache::resolvePhoneNumber(&listener, number, true);
     if (!item) {
         QTRY_VERIFY(listener.m_resolved);
         item = listener.m_item;
+    } else {
+        qWarning() << "should not have resolved:" << number << "to" << item->displayLabel;
     }
 
     QCOMPARE(item, (SeasideCache::CacheItem *)0);
