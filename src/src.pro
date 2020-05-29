@@ -6,12 +6,18 @@ CONFIG += create_pc create_prl no_install_prl
 
 # 'contacts' is too generic for the target name - use 'contactcache'
 TARGET = $${PACKAGENAME}
-target.path = $$PREFIX/lib
+target.path = $$[QT_INSTALL_LIBS]
 INSTALLS += target
+
+# This should be passed on qmake command line
+isEmpty(PKGCONFIG_LIB) {
+    PKGCONFIG_LIB = lib
+    message("PKGCONFIG_LIB is unset, assuming $$PKGCONFIG_LIB")
+}
 
 # version for generated pkgconfig files is defined in the spec file
 QMAKE_PKGCONFIG_INCDIR = $$PREFIX/include/$${PACKAGENAME}
-QMAKE_PKGCONFIG_LIBDIR = $$PREFIX/lib
+QMAKE_PKGCONFIG_LIBDIR = $$PREFIX/$${PKGCONFIG_LIB}
 QMAKE_PKGCONFIG_DESTDIR = pkgconfig
 
 CONFIG += link_pkgconfig
