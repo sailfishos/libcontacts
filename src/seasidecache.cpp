@@ -571,17 +571,21 @@ SeasideCache::SeasideCache()
     // need to find it from the manager's engine object
     typedef QtContactsSqliteExtensions::ContactManagerEngine EngineType;
     EngineType *cme = dynamic_cast<EngineType *>(QContactManagerData::managerData(mgr)->m_engine);
-    connect(cme, SIGNAL(displayLabelGroupsChanged(QStringList)),
-            this, SLOT(displayLabelGroupsChanged(QStringList)));
-    displayLabelGroupsChanged(cme->displayLabelGroups());
+    if (cme) {
+        connect(cme, SIGNAL(displayLabelGroupsChanged(QStringList)),
+                this, SLOT(displayLabelGroupsChanged(QStringList)));
+        displayLabelGroupsChanged(cme->displayLabelGroups());
+        connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactId>)),
+                this, SLOT(contactsPresenceChanged(QList<QContactId>)));
+    } else {
+        qWarning() << "Unable to retrieve contact manager engine";
+    }
 
     connect(mgr, SIGNAL(dataChanged()), this, SLOT(dataChanged()));
     connect(mgr, SIGNAL(contactsAdded(QList<QContactId>)),
             this, SLOT(contactsAdded(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsChanged(QList<QContactId>)),
             this, SLOT(contactsChanged(QList<QContactId>)));
-    connect(cme, SIGNAL(contactsPresenceChanged(QList<QContactId>)),
-            this, SLOT(contactsPresenceChanged(QList<QContactId>)));
     connect(mgr, SIGNAL(contactsRemoved(QList<QContactId>)),
             this, SLOT(contactsRemoved(QList<QContactId>)));
 
